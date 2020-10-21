@@ -43,3 +43,5 @@ red_alliance_(1-3)      Each of the team keys for the 3 red alliance teams
 
 
 **Format of your final product and visualizations you envision **
+
+We will produce a final report along with presentation slides to show our findings and analysis. If we have extra time, we may also create a dashboard with some of our plots.
