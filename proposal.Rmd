@@ -2,22 +2,40 @@
 title: "Final Project Proposal"
 author: "Ryan Harvey and Max Narvaez"
 output: pdf_document
+urlcolor: blue
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-• Website(s) you plan to scrape or data sets you plan to merge
+**Website(s) you plan to scrape or data sets you plan to merge**
 
-We plan to use [The Blue Alliance](https://www.thebluealliance.com), which has data on the FIRST Robotics Competition dating back to 2005.
+We plan to use [The Blue Alliance](https://www.thebluealliance.com), which has data on the FIRST Robotics Competition dating back to 2002.
 
-• Variables you plan to acquire, including variables you plan to generate from your raw data
+**Variables you plan to acquire, including variables you plan to generate from your raw data **
+
+We have successfully already pulled match data for each year. For each year, we have the following data.
+
+Variable Name          Description
+--------------------   ------------------------------------------------------------------------------------
+year                    Year that the competition take place in
+week                    Week of the competition
+event_type              Area scope of competition (i.e. sectionals, districts, regionals)
+comp_level              Level of competition (i.e. qualifying, semis, finals)
+event_key               Unique key for the event
+match_key               Unique key for a match
+key                     Unique key for a match of a specific event
+set_number              Number to identify different comp_level matchups
+match_number            Number to identify which match during a competition
+blue_score              Total score of blue alliance
+red_score               Total score of red alliance
+blue_alliance_(1-3)     Each of the team keys for the 3 blue alliance teams
+red_alliance_(1-3)      Each of the team keys for the 3 red alliance teams
+--------------------   ------------------------------------------------------------------------------------
+
+**Questions you plan to address **
 
 
 
-• Questions you plan to address
-
-
-
-• Format of your final product and visualizations you envision
+**Format of your final product and visualizations you envision **
