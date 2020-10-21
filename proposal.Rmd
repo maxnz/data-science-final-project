@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 **Website(s) you plan to scrape or data sets you plan to merge**
 
-We plan to use [The Blue Alliance](https://www.thebluealliance.com), which has data on the FIRST Robotics Competition dating back to 2002.
+We plan to use [The Blue Alliance](https://www.thebluealliance.com), which has data on the FIRST Robotics Competition dating back to at least 2002.
 
 **Variables you plan to acquire, including variables you plan to generate from your raw data **
 
@@ -19,13 +19,13 @@ We have successfully already pulled match data for each year. For each year, we 
 
 Variable Name          Description
 --------------------   ------------------------------------------------------------------------------------
-year                    Year that the competition take place in
-week                    Week of the competition
-event_type              Area scope of competition (i.e. sectionals, districts, regionals)
-comp_level              Level of competition (i.e. qualifying, semis, finals)
+year                    Year that the competition took place
 event_key               Unique key for the event
-match_key               Unique key for a match
+week                    Week of the season that the event took place
+event_type              Type of competition (i.e. championship, district, regional, etc.)
+comp_level              Level of competition (i.e. qualifying, quarters, semis, finals)
 key                     Unique key for a match of a specific event
+match_key               Unique key for a match
 set_number              Number to identify different comp_level matchups
 match_number            Number to identify which match during a competition
 blue_score              Total score of blue alliance
