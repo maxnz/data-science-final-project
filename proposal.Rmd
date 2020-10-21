@@ -36,6 +36,10 @@ red_alliance_(1-3)      Each of the team keys for the 3 red alliance teams
 
 **Questions you plan to address **
 
+- Do scores improve as the season progresses?
+- Do scores improve as a competition progresses?
+- Do teams that attend multiple competitions perform better during later competitions?
+- Do teams with lower numbers (i.e. have been around longer) perform better than teams with higher numbers?
 
 
 **Format of your final product and visualizations you envision **
