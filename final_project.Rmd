@@ -1,0 +1,231 @@
+---
+title: "Final Project"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(stringr)
+library(rvest)
+library(httr)
+library(jsonlite)
+
+auth_key <- "WyfmKoTeQ8ntOY0s1yfdXhaHsn8uN4myOOYp58A5P4OwGk2ohXRV54Kmc0tHJ7CM"
+```
+
+```{r}
+events_url <- "https://www.thebluealliance.com/api/v3/events/"
+event_url <- "https://www.thebluealliance.com/api/v3/event/"
+get_frc_data_for_year <- function(yr) {
+  # Get names of all events from a specific year
+  event_names <- jsonlite::fromJSON(content(GET(str_c(events_url, as.character(yr)), 
+                                                add_headers("X-TBA-Auth-Key" = auth_key)), 
+                                            "parse", 
+                                            as = "text", 
+                                            encoding = "UTF-8")) %>%
+    select(key, event_type, week) %>%
+    filter(event_type %in% c(0, 1, 2, 3, 4, 5, 6)) # Omit offseason and preseason events
+  
+  # Set up an empty data frame to accumulate our data
+  df <- data.frame(
+    year = integer(),
+    week = integer(),
+    event_key = character(),
+    event_type = character(),
+    key = character(),
+    comp_level = character(),
+    set_number = integer(),
+    match_number = integer(),
+    blue_score = integer(),
+    red_score = integer(),
+    blue_alliance_1 = character(),
+    blue_alliance_2 = character(),
+    blue_alliance_3 = character(),
+    red_alliance_1 = character(),
+    red_alliance_2 = character(),
+    red_alliance_3 = character()
+  )
+  
+  # Get match data for each event
+  for (event in event_names$key) {
+    match_data <- as_tibble(jsonlite::fromJSON(content(GET(str_c(event_url, event, "/matches/simple"), 
+                                                           add_headers("X-TBA-Auth-Key" = auth_key)), 
+                                                       "parse", 
+                                                       as = "text", 
+                                                       encoding = "UTF-8"),
+                                               flatten = TRUE))
+
+    # Confirm that there actually is data for this event
+    if (dim(match_data)[1] != 0) {
+      # Calculate the week
+      wk <- pull(filter(event_names, key == event), week)[1]
+      # Calculate the type of event
+      type <- switch(pull(filter(event_names, key == event), event_type)[1] + 1,
+                     "regional",
+                     "district",
+                     "district_championship",
+                     "championship_division",
+                     "championship_finals",
+                     "field_of_champions")
+      # Format our data into a usable format
+      usable_data <- match_data %>%
+        # Get only columns we want
+        select(event_key,
+               key,
+               comp_level,
+               set_number,
+               match_number,
+               alliances.blue.team_keys,
+               alliances.blue.score,
+               alliances.red.team_keys,
+               alliances.red.score) %>%
+        rename(blue_score = alliances.blue.score,
+               red_score = alliances.red.score) %>%
+        # Extract the teams from the blue alliance into separate columns
+        unnest(alliances.blue.team_keys) %>%
+        group_by(key) %>%
+        mutate(col = seq_along(key)) %>%
+        spread(key = col, 
+               value = alliances.blue.team_keys) %>%
+        { if ("1" %in% colnames(.)) rename(., blue_alliance_1 = `1`)
+          else mutate(., blue_alliance_1 = NA)} %>%
+        { if ("2" %in% colnames(.)) rename(., blue_alliance_2 = `2`)
+          else mutate(., blue_alliance_2 = NA)} %>%
+        { if ("3" %in% colnames(.)) rename(., blue_alliance_3 = `3`)
+          else mutate(., blue_alliance_3 = NA)} %>%
+        # Extract the teams from the red alliance into separate columns
+        unnest(alliances.red.team_keys) %>%
+        group_by(key) %>%
+        mutate(col = seq_along(key)) %>%
+        spread(key = col, 
+               value = alliances.red.team_keys) %>%
+        { if ("1" %in% colnames(.)) rename(., red_alliance_1 = `1`)
+          else mutate(., red_alliance_1 = NA)} %>%
+        { if ("2" %in% colnames(.)) rename(., red_alliance_2 = `2`)
+          else mutate(., red_alliance_2 = NA)} %>%
+        { if ("3" %in% colnames(.)) rename(., red_alliance_3 = `3`)
+          else mutate(., red_alliance_3 = NA)} %>%
+        # Add week, event_type and year columns
+        mutate(week = wk,
+               event_type = type,
+               year = yr)
+      
+      df <- bind_rows(df, usable_data)
+    }
+  }
+  df$comp_level <- as.factor(df$comp_level)
+  df$comp_level <- ordered(df$comp_level,
+                           levels = c("qm", "qf", "sf", "f"))
+  df$event_type <- as.factor(df$event_type)
+  df$event_type <- ordered(df$event_type,
+                           levels = c("regional",
+                                      "district",
+                                      "district_championship",
+                                      "championship_division",
+                                      "championship_finals",
+                                      "district_championship_division",
+                                      "festival_of_champions"))
+  
+  df %>% arrange(event_key, comp_level, set_number, match_number) %>%
+    mutate(match_key = gsub("^.*_", "", key))
+}
+```
+
+
+```{r}
+matches.2002 <- get_frc_data_for_year(2002)
+matches.2003 <- get_frc_data_for_year(2003)
+matches.2004 <- get_frc_data_for_year(2004)
+matches.2005 <- get_frc_data_for_year(2005)
+matches.2006 <- get_frc_data_for_year(2006)
+matches.2007 <- get_frc_data_for_year(2007)
+matches.2008 <- get_frc_data_for_year(2008)
+matches.2009 <- get_frc_data_for_year(2009)
+matches.2010 <- get_frc_data_for_year(2010)
+matches.2011 <- get_frc_data_for_year(2011)
+matches.2012 <- get_frc_data_for_year(2012)
+matches.2013 <- get_frc_data_for_year(2013)
+matches.2014 <- get_frc_data_for_year(2014)
+matches.2015 <- get_frc_data_for_year(2015)
+matches.2016 <- get_frc_data_for_year(2016)
+matches.2017 <- get_frc_data_for_year(2017)
+matches.2018 <- get_frc_data_for_year(2018)
+matches.2019 <- get_frc_data_for_year(2019)
+matches <- bind_rows(matches.2002, matches.2003) %>%
+  bind_rows(matches.2004) %>%
+  bind_rows(matches.2005) %>%
+  bind_rows(matches.2006) %>%
+  bind_rows(matches.2007) %>%
+  bind_rows(matches.2008) %>%
+  bind_rows(matches.2009) %>%
+  bind_rows(matches.2010) %>%
+  bind_rows(matches.2011) %>%
+  bind_rows(matches.2012) %>%
+  bind_rows(matches.2013) %>%
+  bind_rows(matches.2014) %>%
+  bind_rows(matches.2015) %>%
+  bind_rows(matches.2016) %>%
+  bind_rows(matches.2017) %>%
+  bind_rows(matches.2018) %>%
+  bind_rows(matches.2019)
+matches
+
+```
+
+```{r}
+matches %>%
+  filter(comp_level == "qm") %>%
+  group_by(year, match_number) %>%
+  summarize(played = n(), year = year) %>%
+  ggplot() +
+  geom_point(aes(as.factor(match_number), played)) +
+  facet_wrap(vars(year))
+```
+
+```{r}
+mean_chart <- function(df) {
+  df %>%
+    filter(comp_level == "qm") %>%
+    group_by(match_number) %>%
+    summarize(mean_red = mean(red_score), mean_blue = mean(blue_score), matches = n()) %>%
+    ggplot() +
+    geom_point(aes(as.factor(match_number), mean_blue), color = "blue") +
+    geom_point(aes(as.factor(match_number), mean_red), color = "red") +
+    geom_smooth(aes(match_number, mean_blue), color = "blue") +
+    geom_smooth(aes(match_number, mean_red), color = "red")
+}
+mean_chart(matches.2002)
+mean_chart(matches.2003)
+mean_chart(matches.2004)
+mean_chart(matches.2005)
+mean_chart(matches.2006)
+mean_chart(matches.2007)
+mean_chart(matches.2008)
+mean_chart(matches.2009)
+mean_chart(matches.2010)
+mean_chart(matches.2011)
+mean_chart(matches.2012)
+mean_chart(matches.2013)
+mean_chart(matches.2014)
+mean_chart(matches.2015)
+mean_chart(matches.2016)
+mean_chart(matches.2017)
+mean_chart(matches.2018)
+mean_chart(matches.2019)
+# matches.2006 %>%
+#   filter(comp_level == "qm") %>%
+#   group_by(match_number) %>%
+#   summarize(mean_red = mean(red_score), mean_blue = mean(blue_score)) %>%
+#   ggplot() +
+#   geom_point(aes(as.factor(match_number), mean_blue), color = "blue") +
+#   geom_point(aes(as.factor(match_number), mean_red), color = "red") +
+#   geom_smooth(aes(match_number, mean_blue), color = "blue") +
+#   geom_smooth(aes(match_number, mean_red), color = "red")
+# 
+# arrange(event_key, comp_level, match_number)
+# group_by(week) %>%
+#   summarize(blue_score = mean(alliances.blue.score), red_score = mean(alliances.red.score)) %>%
+#   ggplot() +
+#   geom_point(aes(as.factor(week), blue_score), color = "blue") +
+#   geom_point(aes(as.factor(week), red_score), color = "red")
+```
