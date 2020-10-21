@@ -1,0 +1,23 @@
+---
+title: "Final Project Proposal"
+author: "Ryan Harvey and Max Narvaez"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+• Website(s) you plan to scrape or data sets you plan to merge
+
+We plan to use [The Blue Alliance](https://www.thebluealliance.com), which has data on the FIRST Robotics Competition dating back to 2005.
+
+• Variables you plan to acquire, including variables you plan to generate from your raw data
+
+
+
+• Questions you plan to address
+
+
+
+• Format of your final product and visualizations you envision
