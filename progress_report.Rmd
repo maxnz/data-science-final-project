@@ -1,0 +1,23 @@
+---
+title: "Progress Report"
+date: "10/28/2020"
+author: "Ryan Harvey and Max Narvaez"
+output: pdf_document
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**- Updates to your proposal – what has changed in terms of websites scraped, variables acquired and generated, questions addressed, visualizations planned, and format of your final product**
+
+Not much has changed since our proposal. We have successfully scraped data from [The Blue Alliance](https://www.thebluealliance.com). We have adjusted our scraping approach to just make it more efficient because we are working with some *very * large data sets. Our variables acquired represent the ones in the table from the project proposal. The questions we want to address are still the same, but we may come up with more after working with the data more. As for the format of our final product, we will have a report with our methods, plots, and analysis. We will also produce presentation slides. If time allows, we will create a dashboard to better display our plots and results.
+
+**- An update on how your data scraping is coming; you should have already put together your primary data set(s) by Oct 29th.**
+
+Like mentioned before, we have successfully scraped a ton of data. We have been working on organizing this is data frames in optimal ways for us to produce plots. We have seperate data sets for each year (2002-2019). Now we are continuing to tidy up and manipulate the data, so we can have data sets that are organized by year and others organized by team.
+
+**- Names of files where I can find your R code. At a minimum, you should create two Rmd files – one for scraping and creating a tidy data set (that gets written using write_csv) and one doing plots and analyses (after reading tidy data in with read_csv).**
+
+We have all of our files in a git repo. Here is a link the the [GitHub](https://github.com/maxnz/data-science-final-project). If you prefer we share these files with you another way, please let us know.
