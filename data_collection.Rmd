@@ -1,0 +1,178 @@
+---
+title: "data_collection"
+output: pdf_document
+---
+
+```{r, setup, include = FALSE}
+library(tidyverse)
+library(stringr)
+library(rvest)
+library(httr)
+library(jsonlite)
+library(dplyr)
+
+years <- 2002:2019
+```
+
+```{r, collect_data, eval = FALSE}
+
+template <- data.frame(
+  year = integer(),
+  week = integer(),
+  event_key = character(),
+  event_type = factor(),
+  key = character(),
+  match_key = character(),
+  comp_level = factor(levels = c("qm", "ef", "qf", "sf", "f")),
+  set_number = integer(),
+  match_number = integer(),
+  blue_score = integer(),
+  red_score = integer(),
+  winning_alliance = character(),
+  blue_alliance_1 = character(),
+  blue_alliance_2 = character(),
+  blue_alliance_3 = character(),
+  blue_alliance_4 = character(),
+  red_alliance_1 = character(),
+  red_alliance_2 = character(),
+  red_alliance_3 = character(),
+  red_alliance_4 = character()
+)
+
+auth_key <- "WyfmKoTeQ8ntOY0s1yfdXhaHsn8uN4myOOYp58A5P4OwGk2ohXRV54Kmc0tHJ7CM"
+
+get_events <- function(yr) {
+  events_url <- "https://www.thebluealliance.com/api/v3/events/"
+  jsonlite::fromJSON(
+    content(GET(str_c(events_url, as.character(yr)), 
+                add_headers("X-TBA-Auth-Key" = auth_key)), 
+            "parse", 
+            as = "text", 
+            encoding = "UTF-8")
+  )
+}
+
+
+
+get_matches <- function(event) {
+  event_url <- "https://www.thebluealliance.com/api/v3/event/"
+  as_tibble(jsonlite::fromJSON(
+    content(GET(str_c(event_url, 
+                      event, 
+                      "/matches/simple"), 
+                add_headers("X-TBA-Auth-Key" = auth_key)), 
+            "parse", 
+            as = "text", 
+            encoding = "UTF-8"),
+    flatten = TRUE
+  ))
+}
+
+
+
+extract_teams <- function(df) {
+  df %>%
+    # Extract the teams from the blue alliance into separate columns
+    unnest(alliances.blue.team_keys) %>%
+    group_by(key) %>%
+    mutate(col = seq_along(key)) %>%
+    spread(key = col, 
+           value = alliances.blue.team_keys) %>%
+    { if ("1" %in% colnames(.)) rename(., blue_alliance_1 = `1`)
+      else mutate(., blue_alliance_1 = NA) } %>%
+    { if ("2" %in% colnames(.)) rename(., blue_alliance_2 = `2`)
+      else mutate(., blue_alliance_2 = NA) } %>%
+    { if ("3" %in% colnames(.)) rename(., blue_alliance_3 = `3`)
+      else mutate(., blue_alliance_3 = NA) } %>%
+    { if ("4" %in% colnames(.)) rename(., blue_alliance_4 = `4`)
+      else mutate(., blue_alliance_4 = NA) } %>%
+    # Extract the teams from the red alliance into separate columns
+    unnest(alliances.red.team_keys) %>%
+    group_by(key) %>%
+    mutate(col = seq_along(key)) %>%
+    spread(key = col, 
+           value = alliances.red.team_keys) %>%
+    { if ("1" %in% colnames(.)) rename(., red_alliance_1 = `1`)
+      else mutate(., red_alliance_1 = NA) } %>%
+    { if ("2" %in% colnames(.)) rename(., red_alliance_2 = `2`)
+      else mutate(., red_alliance_2 = NA) } %>%
+    { if ("3" %in% colnames(.)) rename(., red_alliance_3 = `3`)
+      else mutate(., red_alliance_3 = NA) } %>%
+    { if ("4" %in% colnames(.)) rename(., red_alliance_4 = `4`)
+      else mutate(., red_alliance_4 = NA) }
+}
+
+
+
+clean_data <- function(df, wk, type, yr) {
+  df %>%
+    select(event_key,
+           key,
+           comp_level,
+           set_number,
+           match_number,
+           alliances.blue.team_keys,
+           alliances.blue.score,
+           alliances.red.team_keys,
+           alliances.red.score,
+           winning_alliance) %>%
+    rename(blue_score = alliances.blue.score,
+           red_score = alliances.red.score) %>%
+    extract_teams() %>%
+    mutate(week = wk,
+           event_type = as.factor(type),
+           comp_level = as.factor(comp_level),
+           year = yr)
+}
+
+
+
+get_frc_data_for_year <- function(df, yr) {
+  # Get names of all events from a specific year
+  event_names <- get_events(yr) %>%
+    select(key, event_type, week) %>%
+    filter(event_type %in% 0:6) # Omit offseason and preseason events
+
+  # Get match data for each event
+  for (event in event_names$key) {
+    raw_data <- get_matches(event)
+
+    # Confirm that there actually is data for this event
+    if (dim(raw_data)[1] != 0) {
+      # Calculate the week
+      wk <- pull(filter(event_names, key == event), week)[1]
+
+      # Calculate the type of event
+      type <- pull(filter(event_names, key == event), event_type)[1]
+
+      df <- bind_rows(df, clean_data(raw_data, wk, type, yr))
+    }
+  }
+
+  df$event_type <- recode_factor(df$event_type, 
+                                 `0` = "regional",
+                                 `1` = "district",
+                                 `2` = "district_championship",
+                                 `3` = "championship_division",
+                                 `4` = "championship_finals",
+                                 `5` = "district_championship_division",
+                                 `6` = "festival_of_champions")
+  
+  df$winning_alliance[df$winning_alliance == ""] <- "tie"
+  
+  df
+}
+
+get_frc_data <- function(template, yrs) {
+  df <- template
+  for (year in yrs) {
+    df <- bind_rows(df, get_frc_data_for_year(template, year))
+  }
+  df %>%
+    arrange(year, event_key, comp_level, set_number, match_number) %>%
+    mutate(match_key = gsub("^.*_", "", key))
+}
+
+collected <- get_frc_data(template, years)
+saveRDS(collected, "matches.rds")
+```

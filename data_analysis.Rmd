@@ -1,0 +1,123 @@
+---
+title: "Final Project"
+output: pdf_document
+---
+
+
+```{r, load_data}
+matches <- readRDS("matches.rds")
+
+scores <- matches %>%
+  pivot_longer(cols = c("red_score", "blue_score"), names_to = "alliance", values_to = "score") %>%
+  mutate(alliance = as.factor(alliance))
+scores$alliance <- recode_factor(scores$alliance,
+                                "red_score" = "red",
+                                "blue_score" = "blue")
+
+teams <- scores %>%
+  pivot_longer(cols = c("red_alliance_1", "red_alliance_2",
+                        "red_alliance_3", "red_alliance_4",
+                        "blue_alliance_1", "blue_alliance_2",
+                        "blue_alliance_3", "blue_alliance_4"),
+               names_to = "position",
+               values_to = "team") %>%
+  filter(!is.na(team)) %>%
+  separate(position, sep = "_alliance_", into = c("team_alliance", "position")) %>%
+  filter(alliance == team_alliance) %>%
+  select(!team_alliance)
+```
+
+```{r}
+matches %>%
+  filter(comp_level == "qm") %>%
+  group_by(year, match_number) %>%
+  summarize(played = n(), year = year) %>%
+  ggplot() +
+  geom_point(aes(match_number, played, color = as.factor(year)))
+```
+
+```{r}
+qm_mean_chart <- function(df) {
+  df %>%
+    filter(comp_level == "qm") %>%
+    group_by(match_number) %>%
+    summarize(mean_red = mean(red_score), mean_blue = mean(blue_score), matches = n(), event_type = event_type) %>%
+    ggplot() +
+    geom_point(aes(match_number, mean_blue, alpha = matches), color = "blue") +
+    geom_point(aes(match_number, mean_red, alpha = matches), color = "red") +
+    geom_smooth(aes(match_number, mean_blue), color = "blue") +
+    geom_smooth(aes(match_number, mean_red), color = "red") +
+    facet_wrap(vars(event_type))
+}
+
+qf_mean_chart <- function(df) {
+  df %>%
+    filter(comp_level == "qf") %>%
+    group_by(match_number) %>%
+    summarize(mean_red = mean(red_score), mean_blue = mean(blue_score), matches = n(), event_type = event_type) %>%
+    ggplot() +
+    geom_point(aes(as.factor(match_number), mean_blue, size = matches), color = "blue") +
+    geom_point(aes(as.factor(match_number), mean_red, size = matches), color = "red")
+}
+
+el_mean_chart <- function(df) {
+  df %>%
+    filter(comp_level != "qm") %>%
+    ggplot() +
+    geom_violin(aes(comp_level, score)) +
+    facet_wrap(vars(event_type))
+}
+matches %>%
+  filter(year == 2018) %>%
+  group_by(event_type) %>%
+  summarize(matches = n())
+matches %>%
+  filter(year == 2018) %>%
+  qm_mean_chart()
+
+matches %>%
+  filter(year == 2018) %>%
+  qf_mean_chart()
+
+
+for (yr in years) {
+  print(scores %>%
+          filter(year == yr) %>%
+          ggplot() +
+          labs(title = as.character(yr)) +
+          geom_violin(aes(comp_level, score)) +
+          facet_wrap(vars(event_type)))
+}
+
+scores %>%
+  filter(year == 2012) %>%
+  el_mean_chart()
+scores %>%
+  filter(year == 2013) %>%
+  el_mean_chart()
+scores %>%
+  filter(year == 2014) %>%
+  el_mean_chart()
+scores %>%
+  filter(year == 2015) %>%
+  el_mean_chart()
+scores %>%
+  filter(year == 2016) %>%
+  el_mean_chart()
+scores %>%
+  filter(year == 2017) %>%
+  el_mean_chart()
+scores %>%
+  filter(year == 2018) %>%
+  # filter(score < 700) %>%
+  el_mean_chart()
+scores %>%
+  filter(year == 2019) %>%
+  el_mean_chart()
+
+```
+
+```{r}
+teams %>%
+  filter(team == "frc2855")
+```
