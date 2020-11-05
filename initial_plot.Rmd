@@ -1,0 +1,52 @@
+---
+title: "Initial Plot"
+date: "11/4/2020"
+author: "Ryan Harvey & Max Narvaez"
+output: pdf_document
+---
+
+```{r, setup, include = FALSE}
+library(tidyverse)
+```
+
+```{r data, echo = FALSE}
+matches <- readRDS("matches.rds")
+
+scores <- matches %>%
+  pivot_longer(cols = c("red_score", "blue_score"), names_to = "alliance", values_to = "score") %>%
+  mutate(alliance = as.factor(alliance))
+scores$alliance <- recode_factor(scores$alliance,
+                                "red_score" = "red",
+                                "blue_score" = "blue")
+
+el_mean_chart <- function(df) {
+  df %>%
+    filter(comp_level != "qm") %>%
+    ggplot() +
+    geom_violin(aes(comp_level, score)) +
+    facet_wrap(vars(event_type))
+}
+```
+
+```{r plot2019, echo = FALSE}
+scores %>%
+  filter(year == 2019) %>%
+  el_mean_chart() +
+  labs(title = "2019 Scores by Competition Level",
+       x = "Competition Level",
+       y = "Score")
+```
+
+This is the first plot we created. It takes all the match data from qualifying, semifinals, and finals matches for 2019 and compares the scores for each of those three competition levels. This allows us to compare the overall scores through the stages of an event. It seems to be the case that the scores for the semifinals are higher than the qualifying, and finals are higher than the semifinals, which makes sense because better teams will be competing in the later stages, so scores will be higher. Also, these plots are split by event type. This way we can compare scores from regionals to scores from district competitions. This type of plot gives us a good baseline of scores that we can reference once we start to examine individual teams.
+
+```{r plot2018, echo = FALSE}
+scores %>%
+  filter(year == 2018) %>%
+  filter(score < 700) %>%
+  el_mean_chart() +
+  labs(title = "2018 Scores by Competition Level",
+       x = "Competition Level",
+       y = "Score")
+```
+
+This is the same kind of plot as the previous, but for 2018. It's important to have a plot like this for each year since the scores are very different each year due to the nature of the competition. By visual inspection, we can estimate a mean score of around 300-400 for 2018, but the 2019 season had a mean of around 60. This makes it tougher to analyze a teams performance season to season just by score alone.
