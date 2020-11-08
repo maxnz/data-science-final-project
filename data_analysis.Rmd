@@ -3,18 +3,35 @@ title: "Final Project"
 output: pdf_document
 ---
 
+```{r, setup, include=FALSE}
+library(tidyverse)
+```
 
-```{r, load_data}
+```{r, years}
+years <- 2002:2019
+```
+
+```{r, load_matches}
 matches <- readRDS("matches.rds")
+```
 
+```{r, load_teams}
+teams <- readRDS("teams.rds") %>%
+  rowwise() %>%
+  mutate(years_competed = length(years))
+```
+
+```{r, scores}
 scores <- matches %>%
   pivot_longer(cols = c("red_score", "blue_score"), names_to = "alliance", values_to = "score") %>%
   mutate(alliance = as.factor(alliance))
 scores$alliance <- recode_factor(scores$alliance,
                                 "red_score" = "red",
                                 "blue_score" = "blue")
+```
 
-teams <- scores %>%
+```{r, matches_by_team, message=FALSE}
+matches_by_team <- scores %>%
   pivot_longer(cols = c("red_alliance_1", "red_alliance_2",
                         "red_alliance_3", "red_alliance_4",
                         "blue_alliance_1", "blue_alliance_2",
@@ -24,10 +41,65 @@ teams <- scores %>%
   filter(!is.na(team)) %>%
   separate(position, sep = "_alliance_", into = c("team_alliance", "position")) %>%
   filter(alliance == team_alliance) %>%
-  select(!team_alliance)
+  select(!team_alliance) %>%
+  mutate(team_num = as.integer(str_remove(team, "frc")))
 ```
 
-```{r}
+```{r, team_plays_by_year, message=FALSE}
+team_plays_by_year <- matches_by_team %>%
+  group_by(team, team_num, year) %>%
+  summarize(played = n(), team_num = team_num) %>%
+  ungroup()
+```
+
+```{r, team_avg_by_year, message=FALSE}
+team_avg_by_year <- matches_by_team %>%
+  group_by(team, team_num, year) %>%
+  summarize(avg_score = mean(score))
+```
+
+```{r, team_percentile_by_year}
+team_percentile_by_year <- data.frame(
+  team = character(),
+  team_num = integer(),
+  year = integer(),
+  avg_score = double(),
+  percentile = double()
+)
+
+for (yr in years) {
+  x <- team_avg_by_year %>%
+    filter(year == yr)
+  x$percentile <- ecdf(x$avg_score)(x$avg_score)
+  
+  team_percentile_by_year <- bind_rows(team_percentile_by_year, x) %>%
+    arrange(team_num)
+}
+
+```
+
+```{r, team_percentile_avg, message=FALSE}
+team_percentile_avg <- team_percentile_by_year %>%
+  group_by(team, team_num) %>%
+  summarize(avg_percentile = mean(percentile)) %>%
+  ungroup()
+```
+
+```{r, message=FALSE}
+for (yr in years) {
+  print(matches_by_team %>%
+          filter(year == yr) %>%
+          group_by(team) %>%
+          summarize(played = n(), avg_score = mean(score)) %>%
+          ungroup() %>%
+          ggplot(aes(played, avg_score)) +
+          geom_jitter() +
+          geom_smooth() +
+          labs(title = str_c("Matches Played vs Average Score - ", as.character(yr))))
+}
+```
+
+```{r, eval=FALSE}
 matches %>%
   filter(comp_level == "qm") %>%
   group_by(year, match_number) %>%
@@ -89,35 +161,122 @@ for (yr in years) {
           facet_wrap(vars(event_type)))
 }
 
-scores %>%
-  filter(year == 2012) %>%
-  el_mean_chart()
-scores %>%
-  filter(year == 2013) %>%
-  el_mean_chart()
-scores %>%
-  filter(year == 2014) %>%
-  el_mean_chart()
-scores %>%
-  filter(year == 2015) %>%
-  el_mean_chart()
-scores %>%
-  filter(year == 2016) %>%
-  el_mean_chart()
-scores %>%
-  filter(year == 2017) %>%
-  el_mean_chart()
-scores %>%
-  filter(year == 2018) %>%
-  # filter(score < 700) %>%
-  el_mean_chart()
-scores %>%
-  filter(year == 2019) %>%
-  el_mean_chart()
+# scores %>%
+#   filter(year == 2012) %>%
+#   el_mean_chart()
+# scores %>%
+#   filter(year == 2013) %>%
+#   el_mean_chart()
+# scores %>%
+#   filter(year == 2014) %>%
+#   el_mean_chart()
+# scores %>%
+#   filter(year == 2015) %>%
+#   el_mean_chart()
+# scores %>%
+#   filter(year == 2016) %>%
+#   el_mean_chart()
+# scores %>%
+#   filter(year == 2017) %>%
+#   el_mean_chart()
+# scores %>%
+#   filter(year == 2018) %>%
+#   # filter(score < 700) %>%
+#   el_mean_chart()
+# scores %>%
+#   filter(year == 2019) %>%
+#   el_mean_chart()
 
 ```
 
+## Matches Played by Team (since 2002)
+
+This chart shows how many matches each team has played across the years 2002 to 2019.
+As expected, teams with lower numbers have played more matches (because they've been around longer).
+Teams don't last forever, which is why many teams have very few matches played.
+
+One team to notice is team 9999.
+This team does not actually exist and is a placeholder for a team that has not received a number yet.
+This usually only happens during preseason and offseason events, though it seems to have happened in a week 0 regional event in 2004.
+
+```{r, message=FALSE}
+matches_by_team %>%
+  group_by(team) %>%
+  summarize(team_num = team_num, played = n()) %>%
+  ungroup() %>%
+  ggplot(aes(team_num, played)) +
+  geom_point() +
+  geom_smooth()
+```
+
+
+## Percentile By Year for Select Teams
+
 ```{r}
-teams %>%
-  filter(team == "frc2855")
+team_nums <- c(16, 33, 111, 118, 148, 254, 330, 900, 1114, 1678, 1816, 2052, 2056, 2220, 2846, 2855, 3130, 4536, 5172, 5434)
+for (i in 1:length(team_nums)) {
+  print(team_percentile_by_year %>%
+          filter(team_num == team_nums[i]) %>%
+          ggplot(aes(as.factor(year), percentile, group = 1)) +
+          geom_point() +
+          geom_line() +
+          ylim(0, 1) +
+          labs(title = str_c("Team ", as.character(team_nums[i])),
+               x = "Year",
+               y = "Percentile"))
+}
+```
+
+## Top Teams by Average Percentile
+
+```{r}
+team_percentile_avg %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  arrange(desc(avg_percentile)) %>%
+  select(team_num, nickname, rookie_year, years_competed, avg_percentile) %>%
+  head(20) %>%
+  knitr::kable(col.names = c("Team Number", "Nickname", "Rookie Year", 
+                             "Years Competed", "Average Percentile"),
+               align = "lllll")
+```
+
+## Longest Competing Teams
+
+```{r}
+team_percentile_avg %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  arrange(desc(years_competed)) %>%
+  select(team_num, nickname, rookie_year, years_competed, avg_percentile) %>%
+  head(50) %>%
+  knitr::kable(col.names = c("Team Number", "Nickname", "Rookie Year", 
+                             "Years Competed", "Average Percentile"),
+               align = "lllll")
+```
+
+
+## Number of Years Competed vs Average Percentile
+
+```{r, message=FALSE, warning=FALSE}
+team_percentile_avg %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  ggplot(aes(years_competed, avg_percentile)) +
+  geom_jitter() +
+  geom_smooth() +
+  labs(title = "Years Competed vs Average Percentile",
+       x = "Years Competed",
+       y = "Average Percentile")
+```
+
+
+## Numbers of Years Competed vs Average Average Percentile
+
+```{r, message=FALSE}
+team_percentile_avg %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  filter(!is.na(years_competed)) %>%
+  group_by(years_competed) %>%
+  summarize(avg_avg_percentile = mean(avg_percentile), num_teams = n()) %>%
+  ggplot() +
+  geom_point(aes(as.factor(years_competed), avg_avg_percentile, size = num_teams)) +
+  geom_line(aes(as.factor(years_competed), avg_avg_percentile, group = 1))
 ```

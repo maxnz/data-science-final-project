@@ -207,12 +207,32 @@ clean_team_data <- function(df) {
     select(key, team_number, nickname, city, state_prov, postal_code, rookie_year)
 }
 
+get_years_competed <- function(team_keys) {
+  year_list <- list()
+  years_competed_url <- "https://www.thebluealliance.com/api/v3/team/"
+  for (team in team_keys) {
+    year_list[[team]] <- jsonlite::fromJSON(
+             content(GET(str_c(years_competed_url,
+                               team,
+                               "/years_participated"), 
+                         add_headers("X-TBA-Auth-Key" = auth_key)), 
+                     "parse",
+                     as = "text",
+                     encoding = "UTF-8")
+    )
+  }
+  year_list
+}
+
 get_teams <- function(df) {
   for (page in 0:16) {
     df <- bind_rows(df, clean_team_data(get_teams_page(page)))
   }
-  df
+  years_competed_url <- "https://www.thebluealliance.com/api/v3/team/"
+  df %>%
+    mutate(years = get_years_competed(key))
 }
+
 team_data <- get_teams(template_teams)
 saveRDS(team_data, "teams.rds")
 ```
