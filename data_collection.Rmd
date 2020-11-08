@@ -14,7 +14,7 @@ library(dplyr)
 years <- 2002:2019
 ```
 
-```{r, collect_data, eval = FALSE}
+```{r, collect_match_data, eval = FALSE}
 
 template <- data.frame(
   year = integer(),
@@ -175,4 +175,44 @@ get_frc_data <- function(template, yrs) {
 
 collected <- get_frc_data(template, years)
 saveRDS(collected, "matches.rds")
+```
+
+
+```{r, collect_team_data}
+auth_key <- "WyfmKoTeQ8ntOY0s1yfdXhaHsn8uN4myOOYp58A5P4OwGk2ohXRV54Kmc0tHJ7CM"
+
+template_teams <- data.frame(
+  key = character(),
+  team_number = integer(),
+  nickname = character(),
+  city = character(),
+  state_prov = character(),
+  postal_code = character(),
+  rookie_year = integer()
+)
+
+get_teams_page <- function(page) {
+  teams_url <- "https://www.thebluealliance.com/api/v3/teams/"
+  jsonlite::fromJSON(
+    content(GET(str_c(teams_url, as.character(page)), 
+                add_headers("X-TBA-Auth-Key" = auth_key)), 
+            "parse", 
+            as = "text", 
+            encoding = "UTF-8")
+  )
+}
+
+clean_team_data <- function(df) {
+  df %>%
+    select(key, team_number, nickname, city, state_prov, postal_code, rookie_year)
+}
+
+get_teams <- function(df) {
+  for (page in 0:16) {
+    df <- bind_rows(df, clean_team_data(get_teams_page(page)))
+  }
+  df
+}
+team_data <- get_teams(template_teams)
+saveRDS(team_data, "teams.rds")
 ```
