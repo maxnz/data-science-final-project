@@ -13,7 +13,7 @@ library(tidyverse)
 years <- 2002:2019
 ```
 
-```{r, load_matches}
+```{r, load_matches, include = FALSE}
 matches <- readRDS("matches.rds") %>%
   mutate(week = factor(week, c("0", "1", "2", "3", "4", "5", "6", "7",
                                "dcmpd", "dcmp", "cmpd", "cmpf", "foc")))
@@ -25,14 +25,14 @@ matches$week[matches$event_type == "championship_finals"] <- "cmpf"
 matches$week[matches$event_type == "festival_of_champions"] <- "foc"
 ```
 
-```{r, load_teams}
+```{r, load_teams, include = FALSE}
 teams <- readRDS("teams.rds") %>%
   filter(rookie_year != 2020) %>%
   rowwise() %>%
   mutate(years_competed = length(years))
 ```
 
-```{r, scores}
+```{r, scores, include = FALSE}
 scores <- matches %>%
   pivot_longer(cols = c("red_score", "blue_score"), 
                names_to = "alliance",
@@ -43,7 +43,7 @@ scores$alliance <- recode_factor(scores$alliance,
                                  "blue_score" = "blue")
 ```
 
-```{r, matches_by_team, message=FALSE}
+```{r, matches_by_team, message = FALSE, include = FALSE}
 matches_by_team <- scores %>%
   pivot_longer(cols = c("red_alliance_1", "red_alliance_2",
                         "red_alliance_3", "red_alliance_4",
@@ -58,14 +58,14 @@ matches_by_team <- scores %>%
   mutate(team_num = as.integer(str_remove(team, "frc")))
 ```
 
-```{r, team_matches_per_year, message=FALSE}
+```{r, team_matches_per_year, message = FALSE, include = FALSE}
 team_matches_per_year <- matches_by_team %>%
   group_by(team, team_num, year) %>%
   summarize(played = n()) %>%
   ungroup()
 ```
 
-```{r, team_events_per_year, message=FALSE}
+```{r, team_events_per_year, message = FALSE, include = FALSE}
 team_events_per_year <- matches_by_team %>%
   group_by(team, team_num, year, event_key, event_type) %>%
   summarize() %>%
@@ -80,13 +80,13 @@ team_events_per_year <- matches_by_team %>%
             in_district = "district" %in% event_type)
 ```
 
-```{r, team_avg_by_year, message=FALSE}
+```{r, team_avg_by_year, message = FALSE, include = FALSE}
 team_avg_by_year <- matches_by_team %>%
   group_by(team, team_num, year) %>%
   summarize(avg_score = mean(score))
 ```
 
-```{r, team_percentile_by_year}
+```{r, team_percentile_by_year, include = FALSE}
 team_percentile_by_year <- data.frame(
   team = character(),
   team_num = integer(),
@@ -106,89 +106,11 @@ for (yr in years) {
 
 ```
 
-```{r, team_percentile_avg, message=FALSE}
+```{r, team_percentile_avg, message = FALSE, include = FALSE}
 team_percentile_avg <- team_percentile_by_year %>%
   group_by(team, team_num) %>%
   summarize(avg_percentile = mean(percentile)) %>%
   ungroup()
-```
-
-```{r, message=FALSE, eval=FALSE, include=FALSE}
-for (yr in years) {
-  print(matches_by_team %>%
-          filter(year == yr) %>%
-          group_by(team) %>%
-          summarize(played = n(), avg_score = mean(score)) %>%
-          ungroup() %>%
-          ggplot(aes(played, avg_score)) +
-          geom_jitter() +
-          geom_smooth() +
-          labs(title = str_c("Matches Played vs Average Score - ", as.character(yr))))
-}
-```
-
-```{r, eval=FALSE, include=FALSE}
-matches %>%
-  filter(comp_level == "qm") %>%
-  group_by(year, match_number) %>%
-  summarize(played = n(), year = year) %>%
-  ggplot() +
-  geom_point(aes(match_number, played, color = as.factor(year)))
-```
-
-```{r, eval=FALSE, include=FALSE}
-qm_mean_chart <- function(df) {
-  df %>%
-    filter(comp_level == "qm") %>%
-    group_by(match_number) %>%
-    summarize(mean_red = mean(red_score), mean_blue = mean(blue_score), matches = n(), event_type = event_type) %>%
-    ggplot() +
-    geom_point(aes(match_number, mean_blue, alpha = matches), color = "blue") +
-    geom_point(aes(match_number, mean_red, alpha = matches), color = "red") +
-    geom_smooth(aes(match_number, mean_blue), color = "blue") +
-    geom_smooth(aes(match_number, mean_red), color = "red") +
-    facet_wrap(vars(event_type))
-}
-
-qf_mean_chart <- function(df) {
-  df %>%
-    filter(comp_level == "qf") %>%
-    group_by(match_number) %>%
-    summarize(mean_red = mean(red_score), mean_blue = mean(blue_score), matches = n(), event_type = event_type) %>%
-    ggplot() +
-    geom_point(aes(as.factor(match_number), mean_blue, size = matches), color = "blue") +
-    geom_point(aes(as.factor(match_number), mean_red, size = matches), color = "red")
-}
-
-el_mean_chart <- function(df) {
-  df %>%
-    filter(comp_level != "qm") %>%
-    ggplot() +
-    geom_violin(aes(comp_level, score)) +
-    facet_wrap(vars(event_type))
-}
-matches %>%
-  filter(year == 2018) %>%
-  group_by(event_type) %>%
-  summarize(matches = n())
-matches %>%
-  filter(year == 2018) %>%
-  qm_mean_chart()
-
-matches %>%
-  filter(year == 2018) %>%
-  qf_mean_chart()
-
-
-for (yr in years) {
-  print(scores %>%
-          filter(year == yr) %>%
-          ggplot() +
-          geom_violin(aes(comp_level, score)) +
-          facet_wrap(vars(event_type)) +
-          labs(title = as.character(yr)))
-}
-
 ```
 
 ## Performance Throughout a Season
@@ -199,7 +121,7 @@ Because the season is multiple weeks long, events happening on the same weekend 
 In some years, performance does seem to improve, but in others it does not.
 For example, in 2017 the performance increased slightly as the weeks of the season progressed:
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 scores %>%
     filter(year == 2017 & week %in% c("0", "1", "2", "3", "4", "5", "6")) %>%
     ggplot() +
@@ -209,7 +131,7 @@ scores %>%
 
 But in the 2009 season, there isn't any obvious improvement:
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 scores %>%
     filter(year == 2009 & week %in% c("0", "1", "2", "3", "4", "5")) %>%
     ggplot() +
@@ -220,7 +142,7 @@ scores %>%
 If we include the championship events, we consistently see an improvement over the weeks prior.
 Using 2009 again, we see that District Championships (`dcmp`), Championship Divisions (`cmpd`) and Championship Finals (`cmpf`) have a very noticeable improvement in scores.
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 scores %>%
     filter(year == 2009) %>%
     ggplot() +
@@ -232,7 +154,7 @@ In many years, the difference between the Championship Finals and other levels c
 Take the 2016 season as an example.
 The weeks progressed with minor improvements, the District Championships and Championship Divisions have an improvement in scores, but the Championship Finals have scores much higher.
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 scores %>%
     filter(year == 2016) %>%
     ggplot() +
@@ -242,32 +164,12 @@ scores %>%
 
 Using a boxplot, we can see that the average score in a Championship Finals match is almost double that of the average score in the Championship Divisions.
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 scores %>%
     filter(year == 2016) %>%
     ggplot() +
     geom_boxplot(aes(week, score)) +
     labs(title = "Score Distribution by Week - 2016")
-```
-
-```{r, message=FALSE, eval=FALSE, include=FALSE}
-for (yr in years) {
-  print(scores %>%
-          filter(year == yr) %>%
-          ggplot() +
-          geom_violin(aes(week, score)) +
-          labs(title = str_c("Score Distribution by Week - ", as.character(yr))))
-}
-```
-
-```{r, eval=FALSE, include=FALSE}
-for (yr in years) {
-  print(scores %>%
-          filter(year == yr) %>%
-          ggplot() +
-          geom_violin(aes(as.factor(event_type), score)) +
-          labs(title = as.character(yr)))
-}
 ```
 
 ## Matches Played by Team (since 2002)
@@ -281,7 +183,7 @@ This team does not actually exist.
 The number 9999 is used as a placeholder for a team that has not received a number yet.
 This usually only happens during preseason and offseason events, though it seems to have happened in a week 0 regional event in 2004.
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 matches_by_team %>%
   group_by(team) %>%
   summarize(team_num = team_num, played = n()) %>%
@@ -296,7 +198,7 @@ matches_by_team %>%
 Because the competition changes every year, comparing raw scores from one year to the next is not a good measure of performance.
 For example, the 2010 competition had an average match score of 4.07, while the 2018 competition had an average match score of 291.90.
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 scores %>%
   group_by(year) %>%
   summarize(avg_score = mean(score)) %>%
@@ -352,22 +254,6 @@ team_percentile_avg %>%
 
 This confirms that Team 3691 is a better-performing team than Team 2855.
 
-
-```{r, eval=FALSE}
-team_nums <- c(16, 33, 111, 118, 148, 254, 330, 900, 1114, 1678, 1816, 2052, 2056, 2220, 2846, 2855, 3130, 4536, 5172, 5434)
-for (i in 1:length(team_nums)) {
-  print(team_percentile_by_year %>%
-          filter(team_num == team_nums[i]) %>%
-          ggplot(aes(as.factor(year), percentile, group = 1)) +
-          geom_point() +
-          geom_line() +
-          ylim(0, 100) +
-          labs(title = str_c("Team ", as.character(team_nums[i])),
-               x = "Year",
-               y = "Percentile"))
-}
-```
-
 ## Top Teams by Average Percentile
 
 We can use this metric to determine the top teams of all time:
@@ -419,7 +305,7 @@ team_percentile_avg %>%
 
 ## Number of Years Competed vs Average Percentile
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message = FALSE, warning = FALSE}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   ggplot(aes(years_competed, avg_percentile)) +
@@ -437,7 +323,7 @@ team_percentile_avg %>%
 When we average the average percentiles for the teams in each group based on years competed, we see noticeable improvement as the teams compete longer.
 (Note that there are very few teams that have competed for over two decades, for example there is only one team that has competed for 28 years.)
 
-```{r, message=FALSE}
+```{r, message = FALSE}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   filter(!is.na(years_competed)) %>%
@@ -458,19 +344,6 @@ team_percentile_avg %>%
 Our question here is to figure out how attending multiple events can impact your team's performance and development.
 First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
 
-```{r, message=FALSE, echo = FALSE, eval = FALSE}
-for (yr in years) {
-  print(team_events_per_year %>%
-          left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
-          filter(year == yr) %>%
-          ggplot() +
-          geom_boxplot(aes(x = as.factor(events), y = percentile)) +
-          labs(x = "Number of Events Attended",
-              y = "Score Percentile for Year",
-              title = as.character(yr)))
-}
-```
-
 ```{r, message = FALSE, echo = FALSE}
 team_events_per_year %>%
   left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
@@ -487,21 +360,6 @@ Clearly, the average score percentile for a team that attends a lot of events wi
 
 It is interesting to see how high a team's score percentile needs to be in order for them to expect to compete in many events.
 For example, in 2019 there were only a few teams that were below the 80th percentile that competed in 5 events.
-
-```{r, message = FALSE, echo = FALSE, eval = FALSE}
-for (yr in years) {
-  print(team_events_per_year %>%
-          filter(year == yr) %>%
-          inner_join(matches_by_team, by = c("team", "team_num", "year")) %>%
-          group_by(team, year, events, week) %>%
-          summarize(matches = n()) %>%
-          ggplot() +
-          geom_boxplot(aes(x = week, y = events)) +
-          labs(x = "Week",
-               y = "Number of Events the Teams Attended Throughout the Year",
-               title = as.character(yr)))
-}
-```
 
 ```{r, message = FALSE, echo = FALSE}
 team_events_per_year %>%
