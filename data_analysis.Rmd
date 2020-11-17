@@ -5,12 +5,12 @@ editor_options:
   chunk_output_type: inline
 ---
 
-```{r, setup, include=FALSE}
+```{r, setup, include = FALSE}
 library(tidyverse)
 library(maps)
 ```
 
-```{r, years}
+```{r, years, include = FALSE}
 years <- 2002:2019
 ```
 
@@ -127,6 +127,37 @@ team_percentile_avg <- team_percentile_by_year %>%
   summarize(avg_percentile = mean(percentile)) %>%
   ungroup()
 ```
+
+## Background
+
+The FIRST Robotics Competition (FRC) has been around since 1992.
+Started in a high school gym in Manchester, NH, with 28 teams, it has since expanded to an international competition with over 160 events and over 3800 active teams.
+
+The FIRST Robotics Competition (FRC) is a competition where teams build a robot for 6ish weeks, then compete in one or more events to try to secure a spot in the championship.
+
+An event consists of two parts, qualification and playoffs.
+During the qualification matches, you play matches with algorithmically assigned teams against another alliance.
+An alliance is a group of three teams that are working together to win against the other alliance.
+There is a blue alliance and a red alliance.
+During the playoff matches, the alliances are picked by the top 8 teams.
+During most events, you pick two other teams to be part of your alliance through the rest of the playoffs.
+If one of your robots breaks, you can request a backup robot to be added to your alliance to replace the broken robot.
+At the championship, you pick three other teams, which means your backup is built-in to your alliance, because you only ever compete with three robots.
+
+A regional is a competition of ~50-60 teams.
+The winning alliance gets to go to the championship.
+If a team in the winning alliance already qualified for the championship, then a team from the second-place alliance gets to go.
+A district is a geographical area where teams attend two ~30-40 team events instead, followed by a district championship.
+The top teams in the district championship get to go to the championship.
+
+Ever since 2005, there have been two alliances of 3 teams each.
+From 1999-2000 and 2002-2004 there were 2 team alliances, 2001 was 4v0, and 1992-1998 did not have alliances.
+We only have data from 2002 to the present.
+
+Each year, teams are challenged by a new competition.
+Everything from making robots play basketball to attacking a castle have been themes for competitions.
+One year, teams may be asked to collect and launch balls into a target (2002, 2004, 2006, 2008, 2009, 2010, 2012, 2014, 2016, 2017, 2019) and the next year be asked to pick up inflatable shapes and place them onto pegs (2007, 2011).
+There have also been years with stacking bins (2003, 2015), a year with tetras (basically a hollow tetrahedron that can be stacked) (2005), a year of ultimate frisbee (2013), and a year with milk crates (2018).
 
 ## Performance Throughout a Season
 
