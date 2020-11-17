@@ -7,6 +7,7 @@ editor_options:
 
 ```{r, setup, include=FALSE}
 library(tidyverse)
+library(maps)
 ```
 
 ```{r, years}
@@ -30,6 +31,20 @@ teams <- readRDS("teams.rds") %>%
   filter(rookie_year != 2020) %>%
   rowwise() %>%
   mutate(years_competed = length(years))
+```
+
+```{r}
+zip.codes <- read.csv("zipcode.csv")
+teams %>%
+  filter(2020 %in% years) %>%
+  mutate(postal_code = parse_number(postal_code)) %>%
+  left_join(zip.codes, by = c("postal_code" = "ZIP")) %>%
+  filter(!is.na(LAT) & !is.na(LNG)) %>%
+  filter(LNG > -140 & LAT > 20) %>%
+  ggplot(aes(x = LNG, y = LAT)) +
+    geom_point() +
+    borders("state") +
+    coord_quickmap()
 ```
 
 ```{r, scores, include = FALSE}
@@ -424,6 +439,9 @@ team_avg_by_week_2019 %>%
   geom_line(data = week_avg_score_2019, mapping = aes(x = week, y = avg.score, group = year), size = 2) +
   labs(x = "Week of 2019 Season",
        y = "Team Average Score")
+
+
+
 ```
 
 Here is a breakdown of score progression throughout the 2019 season for teams that competed in 6 or more events.
