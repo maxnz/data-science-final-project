@@ -108,7 +108,7 @@ team_percentile_avg <- team_percentile_by_year %>%
   ungroup()
 ```
 
-```{r, message=FALSE, eval=FALSE}
+```{r, message=FALSE, eval=FALSE, include=FALSE}
 for (yr in years) {
   print(matches_by_team %>%
           filter(year == yr) %>%
@@ -122,7 +122,7 @@ for (yr in years) {
 }
 ```
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, include=FALSE}
 matches %>%
   filter(comp_level == "qm") %>%
   group_by(year, match_number) %>%
@@ -131,7 +131,7 @@ matches %>%
   geom_point(aes(match_number, played, color = as.factor(year)))
 ```
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, include=FALSE}
 qm_mean_chart <- function(df) {
   df %>%
     filter(comp_level == "qm") %>%
@@ -202,9 +202,50 @@ scores %>%
     labs(title = "Score Distribution by Week - 2017")
 ```
 
-Each season seems to have a general improvement in scores as the weeks progress, but it is not a significant amount and 
+But in the 2009 season, there isn't any obvious improvement:
 
 ```{r, message=FALSE}
+scores %>%
+    filter(year == 2009 & week %in% c("0", "1", "2", "3", "4", "5")) %>%
+    ggplot() +
+    geom_violin(aes(week, score)) +
+    labs(title = "Score Distribution by Week - 2009")
+```
+
+If we include the championship events, we consistently see an improvement over the weeks prior.
+Using 2009 again, we see that District Championships (`dcmp`), Championship Divisions (`cmpd`) and Championship Finals (`cmpf`) have a very noticeable improvement in scores.
+
+```{r, message=FALSE}
+scores %>%
+    filter(year == 2009) %>%
+    ggplot() +
+    geom_violin(aes(week, score)) +
+    labs(title = "Score Distribution by Week - 2009")
+```
+
+In many years, the difference between the Championship Finals and other levels can be drastic.
+Take the 2016 season as an example.
+The weeks progressed with minor improvements, the District Championships and Championship Divisions have an improvement in scores, but the Championship Finals have scores much higher.
+
+```{r, message=FALSE}
+scores %>%
+    filter(year == 2016) %>%
+    ggplot() +
+    geom_violin(aes(week, score)) +
+    labs(title = "Score Distribution by Week - 2016")
+```
+
+Using a boxplot, we can see that the average score in a Championship Finals match is almost double that of the average score in the Championship Divisions.
+
+```{r, message=FALSE}
+scores %>%
+    filter(year == 2016) %>%
+    ggplot() +
+    geom_boxplot(aes(week, score)) +
+    labs(title = "Score Distribution by Week - 2016")
+```
+
+```{r, message=FALSE, eval=FALSE, include=FALSE}
 for (yr in years) {
   print(scores %>%
           filter(year == yr) %>%
@@ -214,7 +255,7 @@ for (yr in years) {
 }
 ```
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 for (yr in years) {
   print(scores %>%
           filter(year == yr) %>%
@@ -248,7 +289,7 @@ matches_by_team %>%
 ## Comparing Performance Across Years
 
 Because the competition changes every year, comparing raw scores from one year to the next is not a good measure of performance.
-For example, the 2010 competition had an average match score of 4.07, while the 2018 competition had an average match score of 219.90.
+For example, the 2010 competition had an average match score of 4.07, while the 2018 competition had an average match score of 291.90.
 
 ```{r, message=FALSE}
 scores %>%
@@ -267,7 +308,6 @@ For example, the performance of Team 2855 (Max's former team) is shown below:
 team_percentile_by_year %>%
   filter(team_num == 2855) %>%
   ggplot(aes(as.factor(year), percentile, group = 1)) +
-  geom_point() +
   geom_line() +
   ylim(0, 100) +
   labs(title = "Performance of Team 2855",
@@ -283,7 +323,6 @@ We can compare this to Team 3691, based out of Northfield High School:
 team_percentile_by_year %>%
   filter(team_num == 3691) %>%
   ggplot(aes(as.factor(year), percentile, group = 1)) +
-  geom_point() +
   geom_line() +
   ylim(0, 100) +
   labs(title = "Performance of Team 3691",
@@ -307,6 +346,7 @@ team_percentile_avg %>%
 ```
 
 This confirms that Team 3691 is a better-performing team than Team 2855.
+
 
 ```{r, eval=FALSE}
 team_nums <- c(16, 33, 111, 118, 148, 254, 330, 900, 1114, 1678, 1816, 2052, 2056, 2220, 2846, 2855, 3130, 4536, 5172, 5434)
@@ -338,7 +378,7 @@ team_percentile_avg %>%
                align = "llllll")
 ```
 
-A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, giving them an average percentile of 99.90%.
+A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, giving them an average percentile of 99.90%. (Notice that the graph only shows the 95th to 100th percentiles, and yet they're still at the top.)
 
 ```{r}
 team_percentile_by_year %>%
@@ -364,6 +404,7 @@ team_percentile_avg %>%
   arrange(desc(years_competed), team_num) %>%
   select(team_num, nickname, rookie_year, years_competed, state_prov, avg_percentile) %>%
   head(30) %>%
+  mutate(nickname = ifelse(team_num == 173, "RAGE Robotics", nickname)) %>%
   knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
                              "Years Competed", "State/Province", "Average Percentile"),
                align = "llllll")
@@ -386,6 +427,9 @@ team_percentile_avg %>%
 
 
 ## Numbers of Years Competed vs Average Average Percentile
+
+When we average the average percentiles for the teams in each group based on years competed, we see noticeable improvement as the teams compete longer.
+(Note that there are very few teams in the higher durations, for example there is only one team that has competed for 28 years and only )
 
 ```{r, message=FALSE}
 team_percentile_avg %>%
