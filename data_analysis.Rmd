@@ -15,7 +15,8 @@ years <- 2002:2019
 
 ```{r, load_matches}
 matches <- readRDS("matches.rds") %>%
-  mutate(week = factor(week, c("0", "1", "2", "3", "4", "5", "6", "7", "dcmpd", "dcmp", "cmpd", "cmpf", "foc")))
+  mutate(week = factor(week, c("0", "1", "2", "3", "4", "5", "6", "7",
+                               "dcmpd", "dcmp", "cmpd", "cmpf", "foc")))
 
 matches$week[matches$event_type == "district_championship_division"] <- "dcmpd"
 matches$week[matches$event_type == "district_championship"] <- "dcmp"
@@ -33,7 +34,9 @@ teams <- readRDS("teams.rds") %>%
 
 ```{r, scores}
 scores <- matches %>%
-  pivot_longer(cols = c("red_score", "blue_score"), names_to = "alliance", values_to = "score") %>%
+  pivot_longer(cols = c("red_score", "blue_score"), 
+               names_to = "alliance",
+               values_to = "score") %>%
   mutate(alliance = as.factor(alliance))
 scores$alliance <- recode_factor(scores$alliance,
                                  "red_score" = "red",
@@ -380,7 +383,8 @@ team_percentile_avg %>%
                align = "llllll")
 ```
 
-A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, giving them an average percentile of 99.90%. (Notice that the graph only shows the 95th to 100th percentiles, and yet they're still at the top.)
+A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, giving them an average percentile of 99.90%.
+(Notice that the graph only shows the 95th to 100th percentiles, and yet they're still at the top.)
 
 ```{r}
 team_percentile_by_year %>%
@@ -431,7 +435,7 @@ team_percentile_avg %>%
 ## Numbers of Years Competed vs Average Percentile
 
 When we average the average percentiles for the teams in each group based on years competed, we see noticeable improvement as the teams compete longer.
-(Note that there are very few teams in the higher durations, for example there is only one team that has competed for 28 years and only )
+(Note that there are very few teams that have competed for over two decades, for example there is only one team that has competed for 28 years.)
 
 ```{r, message=FALSE}
 team_percentile_avg %>%
@@ -451,9 +455,10 @@ team_percentile_avg %>%
 
 ## Number of Events Attended and Performance
 
-Our question here is to figure out how attending multiple events can impact your team's performance and development. First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
+Our question here is to figure out how attending multiple events can impact your team's performance and development.
+First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
 
-```{r, message=FALSE, echo = FALSE}
+```{r, message=FALSE, echo = FALSE, eval = FALSE}
 for (yr in years) {
   print(team_events_per_year %>%
           left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
@@ -466,11 +471,24 @@ for (yr in years) {
 }
 ```
 
-These results aren't too shocking, but they give us some useful information to keep in mind later. Cleary, the average score percentile for a team that attends a lot of events will be higher than a team that attends few since higher scoring teams are able to compete in more events.
-
-It is interesting to see how high a team's score percentile needs to be in order for them to expect to compete in many events. For example, in 2019 there were only a few teams that were below the 80th percentile that competed in 5 events.
-
 ```{r, message = FALSE, echo = FALSE}
+team_events_per_year %>%
+  left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
+  filter(year == 2019) %>%
+  ggplot() +
+  geom_boxplot(aes(x = as.factor(events), y = percentile)) +
+  labs(x = "Number of Events Attended",
+       y = "Score Percentile for Year",
+       title = as.character(yr))
+```
+
+These results aren't too shocking, but they give us some useful information to keep in mind later.
+Clearly, the average score percentile for a team that attends a lot of events will be higher than a team that attends few since higher scoring teams are able to compete in more events.
+
+It is interesting to see how high a team's score percentile needs to be in order for them to expect to compete in many events.
+For example, in 2019 there were only a few teams that were below the 80th percentile that competed in 5 events.
+
+```{r, message = FALSE, echo = FALSE, eval = FALSE}
 for (yr in years) {
   print(team_events_per_year %>%
           filter(year == yr) %>%
@@ -485,7 +503,21 @@ for (yr in years) {
 }
 ```
 
-These boxplots don't reveal too many interesting trends, but they give us an understanding of the average number of events a team participates in based on how far they make it in a season. When we investigate the 2019 scores of the championship division and the championship finals, we can use the median number of events attended 4 and 5, respectively to compare the team scores between teams that attended a lot of events and few events.
+```{r, message = FALSE, echo = FALSE}
+team_events_per_year %>%
+  filter(year == 2019) %>%
+  inner_join(matches_by_team, by = c("team", "team_num", "year")) %>%
+  group_by(team, year, events, week) %>%
+  summarize(matches = n()) %>%
+  ggplot() +
+  geom_boxplot(aes(x = week, y = events)) +
+  labs(x = "Week",
+       y = "Number of Events the Teams Attended Throughout the Year",
+       title = as.character(yr))
+```
+
+These boxplots don't reveal too many interesting trends, but they give us an understanding of how the average number of events a team participates is based on how far they make it in a season.
+When we investigate the 2019 scores of the championship division and the championship finals, we can use the median number of events attended 4 and 5, respectively to compare the team scores between teams that attended a lot of events and few events.
 
 ```{r, message = FALSE, echo = FALSE}
 team_avg_by_week_2019 <- team_events_per_year %>%
@@ -508,7 +540,10 @@ team_avg_by_week_2019 %>%
        y = "Average Score at Championship Division")
 ```
 
-This is the breakdown of teams in the championship division based on the 4 events attended cutoff we found previously. This plot is showing that the teams that attended 4 or more events in 2019 score better in this event than those who didn't. We can't use this as evidence that a team that has more experience will score better though since a winning team in the championship division will attend the championship finals, which adds to their event count. A more interesing plot is this same boxplot for the championship finals below.
+This is the breakdown of teams in the championship division based on the 4 events attended cutoff we found previously.
+This plot is showing that the teams that attended 4 or more events in 2019 score better in this event than those who didn't.
+We can't use this as evidence that a team that has more experience will score better though since a winning team in the championship division will attend the championship finals, which adds to their event count.
+A more interesing plot is this same boxplot for the championship finals below.
 
 ```{r, message = FALSE, echo = FALSE}
 team_avg_by_week_2019 %>%
@@ -519,7 +554,9 @@ team_avg_by_week_2019 %>%
        y = "Average Score at Championship Finals")
 ```
 
-This plot tells the opposite story from before. The teams that made it to the finals who competed in more events actually performed worse in this case. This shows experience in a single season isn't the most reliable indicator of season performance.
+This plot tells the opposite story from before.
+The teams that made it to the finals who competed in more events actually performed worse in this case.
+This shows experience in a single season isn't the most reliable indicator of season performance.
 
 ```{r, message = FALSE, echo = FALSE}
 team_avg_by_week_2019 %>%
@@ -531,7 +568,11 @@ team_avg_by_week_2019 %>%
        y = "Team Average Score")
 ```
 
-Here is a breakdown of score progression throughout the 2019 season for teams that competed in 6 or more events. These are the teams that competed in the most events of all the teams. All of the teams have positive trends that indicate the teams are still progressing through each of the many events they attend in the 2019 season.
+Here is a breakdown of score progression throughout the 2019 season for teams that competed in 6 or more events.
+These are the teams that competed in the most events of all the teams.
+All of the teams have positive trends that indicate the teams are still progressing through each of the many events they attend in the 2019 season.
 
-The black line is the team average score each week for all the teams, not just the one's who attended a lot of events. The scores of the more experienced teams are usually higher than this average for each week. The black line has a few sudden jumps, which can be explained by the jump from regular season to postseason, and the jump to the finals. The jumps are caused by the competition level increases that eliminate lower scoring teams.
-
+The black line is the team average score each week for all the teams, not just the one's who attended a lot of events.
+The scores of the more experienced teams are usually higher than this average for each week.
+The black line has a few sudden jumps, which can be explained by the jump from regular season to postseason, and the jump to the finals.
+The jumps are caused by the competition level increases that eliminate lower scoring teams.
