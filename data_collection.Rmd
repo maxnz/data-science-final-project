@@ -10,7 +10,7 @@ library(rvest)
 library(httr)
 library(jsonlite)
 library(dplyr)
-library(RCurl)
+# library(RCurl)
 
 years <- 2002:2019
 ```
@@ -189,6 +189,7 @@ template_teams <- data.frame(
   city = character(),
   state_prov = character(),
   postal_code = character(),
+  country = character(),
   rookie_year = integer()
 )
 
@@ -205,7 +206,7 @@ get_teams_page <- function(page) {
 
 clean_team_data <- function(df) {
   df %>%
-    select(key, team_number, nickname, city, state_prov, postal_code, rookie_year)
+    select(key, team_number, nickname, city, state_prov, postal_code, country, rookie_year)
 }
 
 get_years_competed <- function(team_keys) {

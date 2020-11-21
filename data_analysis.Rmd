@@ -1,6 +1,17 @@
 ---
 title: "Final Project"
-output: pdf_document
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+    df_print: paged
+knit: (function(inputFile, encoding) { 
+           rmarkdown::render(inputFile, 
+                             encoding = encoding, 
+                             output_file = file.path(dirname(inputFile), 
+                                                     'index.html')) 
+       })
 editor_options: 
   chunk_output_type: inline
 ---
@@ -8,46 +19,21 @@ editor_options:
 ```{r, setup, include = FALSE}
 library(tidyverse)
 library(maps)
-```
 
-```{r, years, include = FALSE}
 years <- 2002:2019
-```
 
-```{r, load_matches, include = FALSE}
 matches <- readRDS("matches.rds") %>%
+  mutate(week = case_when(
+    event_type == "district_championship_division" ~ "dcmpd",
+    event_type == "district_championship" ~ "dcmp",
+    event_type == "championship_division" ~ "cmpd",
+    event_type == "championship_finals" ~ "cmpf",
+    event_type == "festival_of_champions" ~ "foc",
+    TRUE ~ as.character(week)
+  )) %>%
   mutate(week = factor(week, c("0", "1", "2", "3", "4", "5", "6", "7",
                                "dcmpd", "dcmp", "cmpd", "cmpf", "foc")))
 
-matches$week[matches$event_type == "district_championship_division"] <- "dcmpd"
-matches$week[matches$event_type == "district_championship"] <- "dcmp"
-matches$week[matches$event_type == "championship_division"] <- "cmpd"
-matches$week[matches$event_type == "championship_finals"] <- "cmpf"
-matches$week[matches$event_type == "festival_of_champions"] <- "foc"
-```
-
-```{r, load_teams, include = FALSE}
-teams <- readRDS("teams.rds") %>%
-  filter(rookie_year != 2020) %>%
-  rowwise() %>%
-  mutate(years_competed = length(years))
-```
-
-```{r}
-zip.codes <- read.csv("zipcode.csv")
-teams %>%
-  filter(2020 %in% years) %>%
-  mutate(postal_code = parse_number(postal_code)) %>%
-  left_join(zip.codes, by = c("postal_code" = "ZIP")) %>%
-  filter(!is.na(LAT) & !is.na(LNG)) %>%
-  filter(LNG > -140 & LAT > 20) %>%
-  ggplot(aes(x = LNG, y = LAT)) +
-    geom_point() +
-    borders("state") +
-    coord_quickmap()
-```
-
-```{r, scores, include = FALSE}
 scores <- matches %>%
   pivot_longer(cols = c("red_score", "blue_score"), 
                names_to = "alliance",
@@ -56,9 +42,12 @@ scores <- matches %>%
 scores$alliance <- recode_factor(scores$alliance,
                                  "red_score" = "red",
                                  "blue_score" = "blue")
-```
 
-```{r, matches_by_team, message = FALSE, include = FALSE}
+teams <- readRDS("teams.rds") %>%
+  filter(rookie_year != 2020) %>%
+  rowwise() %>%
+  mutate(years_competed = length(years))
+
 matches_by_team <- scores %>%
   pivot_longer(cols = c("red_alliance_1", "red_alliance_2",
                         "red_alliance_3", "red_alliance_4",
@@ -73,67 +62,11 @@ matches_by_team <- scores %>%
   mutate(team_num = as.integer(str_remove(team, "frc")))
 ```
 
-```{r, team_matches_per_year, message = FALSE, include = FALSE}
-team_matches_per_year <- matches_by_team %>%
-  group_by(team, team_num, year) %>%
-  summarize(played = n()) %>%
-  ungroup()
-```
-
-```{r, team_events_per_year, message = FALSE, include = FALSE}
-team_events_per_year <- matches_by_team %>%
-  group_by(team, team_num, year, event_key, event_type) %>%
-  summarize() %>%
-  ungroup() %>%
-  group_by(team, team_num, year) %>%
-  summarize(events = n(),
-            non_cmp_events = length(event_key[event_type %in% c("regional", 
-                                                                "district")]),
-            attended_dcmp = "district_championship" %in% event_type | 
-              "district_championship_division" %in% event_type,
-            attended_cmp = "championship_division" %in% event_type,
-            in_district = "district" %in% event_type)
-```
-
-```{r, team_avg_by_year, message = FALSE, include = FALSE}
-team_avg_by_year <- matches_by_team %>%
-  group_by(team, team_num, year) %>%
-  summarize(avg_score = mean(score))
-```
-
-```{r, team_percentile_by_year, include = FALSE}
-team_percentile_by_year <- data.frame(
-  team = character(),
-  team_num = integer(),
-  year = integer(),
-  avg_score = double(),
-  percentile = double()
-)
-
-for (yr in years) {
-  x <- team_avg_by_year %>%
-    filter(year == yr)
-  x$percentile <- ecdf(x$avg_score)(x$avg_score) * 100
-  
-  team_percentile_by_year <- bind_rows(team_percentile_by_year, x) %>%
-    arrange(team_num)
-}
-
-```
-
-```{r, team_percentile_avg, message = FALSE, include = FALSE}
-team_percentile_avg <- team_percentile_by_year %>%
-  group_by(team, team_num) %>%
-  summarize(avg_percentile = mean(percentile)) %>%
-  ungroup()
-```
-
 ## Background
 
-The FIRST Robotics Competition (FRC) has been around since 1992.
-Started in a high school gym in Manchester, NH, with 28 teams, it has since expanded to an international competition with over 160 events and over 3800 active teams.
-
 The FIRST Robotics Competition (FRC) is a competition where teams build a robot for 6ish weeks, then compete in one or more events to try to secure a spot in the championship.
+
+### Competition Structure
 
 An event consists of two parts, qualification and playoffs.
 During the qualification matches, you play matches with algorithmically assigned teams against another alliance.
@@ -151,15 +84,70 @@ A district is a geographical area where teams attend two ~30-40 team events inst
 The top teams in the district championship get to go to the championship.
 
 Ever since 2005, there have been two alliances of 3 teams each.
-From 1999-2000 and 2002-2004 there were 2 team alliances, 2001 was 4v0, and 1992-1998 did not have alliances.
-We only have data from 2002 to the present.
+In 1999-2000 and 2002-2004 there were 2 team alliances, 2001 was 4v0, and 1992-1998 did not have alliances.
+We only have match data from 2002 to the present.
 
 Each year, teams are challenged by a new competition.
 Everything from making robots play basketball to attacking a castle have been themes for competitions.
 One year, teams may be asked to collect and launch balls into a target (2002, 2004, 2006, 2008, 2009, 2010, 2012, 2014, 2016, 2017, 2019) and the next year be asked to pick up inflatable shapes and place them onto pegs (2007, 2011).
 There have also been years with stacking bins (2003, 2015), a year with tetras (basically a hollow tetrahedron that can be stacked) (2005), a year of ultimate frisbee (2013), and a year with milk crates (2018).
 
-## Performance Throughout a Season
+### Team Locations
+
+The FIRST Robotics Competition (FRC) started in 1992 in a high school gym in Manchester, NH.
+In 1992, there were 28 teams at 1 competition.
+In 2019, there were over 3800 active teams competing at over 160 events worldwide.
+
+Teams are located all over the world, with 31 countries represented in 2019.
+
+```{r, countries, message = FALSE}
+teams %>%
+  filter(2019 %in% years) %>%
+  group_by(country) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count)) %>%
+  knitr::kable(col.names = c("Country", "Number of Teams"),
+               align = "ll")
+```
+
+The vast majority of the teams are located in the US.
+Every state has at least 1 team.
+
+```{r, states, message = FALSE}
+teams %>%
+  filter(2019 %in% years & country == "USA") %>%
+  mutate(state_prov = case_when(
+    state_prov == "CT" ~ "Connecticut",
+    state_prov == "MI" ~ "Michigan",
+    state_prov == "TX" ~ "Texas",
+    TRUE ~ state_prov
+  )) %>%
+  group_by(state_prov) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count)) %>%
+  knitr::kable(col.names = c("State/Province", "Number of Teams"),
+               align = "ll")
+```
+
+This is the distribution of US teams (note that 28 Hawaiian teams, 1 Alaskan team and 1 Puerto Rican team are omitted)
+
+```{r, state_map, message = FALSE}
+zip.codes <- read.csv("zipcode.csv")
+teams %>%
+  filter(2019 %in% years & country == "USA") %>%
+  mutate(postal_code = parse_number(postal_code)) %>%
+  left_join(zip.codes, by = c("postal_code" = "ZIP")) %>%
+  filter(!is.na(LAT) & !is.na(LNG)) %>%
+  filter(LNG > -140 & LAT > 20) %>%
+  group_by(postal_code) %>%
+  summarize(count = n(), LAT = LAT, LNG = LNG) %>%
+  ggplot(aes(LNG, LAT, alpha = count)) +
+  geom_point() +
+  borders("state") +
+  coord_quickmap()
+```
+
+## Performance Within a Season
 
 To evaluate performance within a season, we can compare each week of competition.
 Because the season is multiple weeks long, events happening on the same weekend are classified as being part of that "week" of competition.
@@ -167,97 +155,104 @@ Because the season is multiple weeks long, events happening on the same weekend 
 In some years, performance does seem to improve, but in others it does not.
 For example, in 2017 the performance increased slightly as the weeks of the season progressed:
 
-```{r, message = FALSE}
+```{r, scores_2017, message = FALSE}
 scores %>%
-    filter(year == 2017 & week %in% c("0", "1", "2", "3", "4", "5", "6")) %>%
-    ggplot() +
-    geom_violin(aes(week, score)) +
-    labs(title = "Score Distribution by Week - 2017")
+  filter(year == 2017 & week %in% 0:6) %>%
+  ggplot() +
+  geom_violin(aes(week, score)) +
+  labs(title = "Score Distribution by Week - 2017")
 ```
 
 But in the 2009 season, there isn't any obvious improvement:
 
-```{r, message = FALSE}
+```{r, scores_2009, message = FALSE}
 scores %>%
-    filter(year == 2009 & week %in% c("0", "1", "2", "3", "4", "5")) %>%
-    ggplot() +
-    geom_violin(aes(week, score)) +
-    labs(title = "Score Distribution by Week - 2009")
+  filter(year == 2009 & week %in% 0:5) %>%
+  ggplot() +
+  geom_violin(aes(week, score)) +
+  labs(title = "Score Distribution by Week - 2009")
 ```
 
 If we include the championship events, we consistently see an improvement over the weeks prior.
 Using 2009 again, we see that District Championships (`dcmp`), Championship Divisions (`cmpd`) and Championship Finals (`cmpf`) have a very noticeable improvement in scores.
 
-```{r, message = FALSE}
+```{r, scores_2009_all, message = FALSE}
 scores %>%
-    filter(year == 2009) %>%
-    ggplot() +
-    geom_violin(aes(week, score)) +
-    labs(title = "Score Distribution by Week - 2009")
+  filter(year == 2009) %>%
+  ggplot() +
+  geom_violin(aes(week, score)) +
+  labs(title = "Score Distribution by Week - 2009")
 ```
 
 In many years, the difference between the Championship Finals and other levels can be drastic.
 Take the 2016 season as an example.
 The weeks progressed with minor improvements, the District Championships and Championship Divisions have an improvement in scores, but the Championship Finals have scores much higher.
 
-```{r, message = FALSE}
+```{r, scores_2016, message = FALSE}
 scores %>%
-    filter(year == 2016) %>%
-    ggplot() +
-    geom_violin(aes(week, score)) +
-    labs(title = "Score Distribution by Week - 2016")
+  filter(year == 2016) %>%
+  ggplot() +
+  geom_violin(aes(week, score)) +
+  labs(title = "Score Distribution by Week - 2016")
 ```
 
 Using a boxplot, we can see that the average score in a Championship Finals match is almost double that of the average score in the Championship Divisions.
 
-```{r, message = FALSE}
+```{r, score_dist_2016, message = FALSE}
 scores %>%
-    filter(year == 2016) %>%
-    ggplot() +
-    geom_boxplot(aes(week, score)) +
-    labs(title = "Score Distribution by Week - 2016")
+  filter(year == 2016) %>%
+  ggplot() +
+  geom_boxplot(aes(week, score)) +
+  labs(title = "Score Distribution by Week - 2016")
 ```
 
-## Matches Played by Team (since 2002)
-
-This chart shows how many matches each team has played across the years 2002 to 2019.
-As expected, teams with lower numbers have played more matches (because they've been around longer).
-But, teams don't last forever, which is why many teams have very few matches played.
-
-One team to notice is team 9999.
-This team does not actually exist.
-The number 9999 is used as a placeholder for a team that has not received a number yet.
-This usually only happens during preseason and offseason events, though it seems to have happened in a week 0 regional event in 2004.
-
-```{r, message = FALSE}
-matches_by_team %>%
-  group_by(team) %>%
-  summarize(team_num = team_num, played = n()) %>%
-  ungroup() %>%
-  ggplot(aes(team_num, played)) +
-  geom_point() +
-  geom_smooth()
-```
-
-## Comparing Performance Across Years
+## Comparing Performance Between Multiple Seasons
 
 Because the competition changes every year, comparing raw scores from one year to the next is not a good measure of performance.
 For example, the 2010 competition had an average match score of 4.07, while the 2018 competition had an average match score of 291.90.
 
-```{r, message = FALSE}
+```{r, year_score_avgs, message = FALSE}
 scores %>%
   group_by(year) %>%
   summarize(avg_score = mean(score)) %>%
   knitr::kable(col.names = c("Year", "Average Score"),
-        align = "ll")
+               align = "ll")
 ```
 
 We found that a good way to compare across years is to compute a team's performance relative to the rest of the teams in the competition that year.
 By calculating the average score achieved by each team, we can determine what percentile each team achieved in a given year.
 
+```{r, team_percentiles, message = FALSE}
+team_avg_by_year <- matches_by_team %>%
+  group_by(team, team_num, year) %>%
+  summarize(avg_score = mean(score))
+
+team_percentile_by_year <- data.frame(
+  team = character(),
+  team_num = integer(),
+  year = integer(),
+  avg_score = double(),
+  percentile = double()
+)
+
+for (yr in years) {
+  x <- team_avg_by_year %>%
+    filter(year == yr)
+  x$percentile <- ecdf(x$avg_score)(x$avg_score) * 100
+  
+  team_percentile_by_year <- bind_rows(team_percentile_by_year, x) %>%
+    arrange(team_num)
+}
+
+team_percentile_avg <- team_percentile_by_year %>%
+  group_by(team, team_num) %>%
+  summarize(avg_performance = mean(percentile)) %>%
+  ungroup()
+```
+
 For example, the performance of Team 2855 (Max's former team) is shown below:
 
-```{r}
+```{r, performance_2855}
 team_percentile_by_year %>%
   filter(team_num == 2855) %>%
   ggplot(aes(as.factor(year), percentile, group = 1)) +
@@ -272,7 +267,7 @@ As shown here, Team 2855 has had a couple of good years, but overall has been an
 
 We can compare this to Team 3691, based out of Northfield High School:
 
-```{r}
+```{r, performance_3691}
 team_percentile_by_year %>%
   filter(team_num == 3691) %>%
   ggplot(aes(as.factor(year), percentile, group = 1)) +
@@ -284,41 +279,41 @@ team_percentile_by_year %>%
 ```
 
 At first glance, it seems like Team 3691 has been a better-performing team than Team 2855.
-We can average all of a team's percentiles to confirm this.
+We can average all of a team's percentiles to determine an average performance.
 
-```{r}
+```{r, performance_2855_3691_comp}
 team_percentile_avg %>%
   filter(team_num %in% c(2855, 3691)) %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   arrange(team_num) %>%
-  select(team_num, nickname, rookie_year, years_competed, avg_percentile) %>%
+  select(team_num, nickname, rookie_year, years_competed, avg_performance) %>%
   head(20) %>%
   knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
-                             "Years Competed", "Average Percentile"),
+                             "Years Competed", "Average Performance"),
                align = "lllll")
 ```
 
 This confirms that Team 3691 is a better-performing team than Team 2855.
 
-## Top Teams by Average Percentile
+## Top Performing Teams of All Time
 
-We can use this metric to determine the top teams of all time:
+We can use our average performance metric to determine the top teams of all time:
 
-```{r}
+```{r, top_performance}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
-  arrange(desc(avg_percentile)) %>%
-  select(team_num, nickname, rookie_year, years_competed, state_prov, avg_percentile) %>%
+  arrange(desc(avg_performance)) %>%
+  select(team_num, nickname, rookie_year, years_competed, state_prov, avg_performance) %>%
   head(20) %>%
   knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
-                             "Years Competed", "State/Province", "Average Percentile"),
+                             "Years Competed", "State/Province", "Average Performance"),
                align = "llllll")
 ```
 
-A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, giving them an average percentile of 99.90%.
+A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, performing in the 99.91th percentile on average.
 (Notice that the graph only shows the 95th to 100th percentiles, and yet they're still at the top.)
 
-```{r}
+```{r, perform}
 team_percentile_by_year %>%
   filter(team_num == 2056) %>%
   ggplot(aes(as.factor(year), percentile, group = 1)) +
@@ -332,63 +327,178 @@ team_percentile_by_year %>%
 
 Other teams that stand out are teams 2970 and 2098, which only competed for one season but were one of the best teams in that season.
 
-## Longest Competing Teams
+## Performance of Longest Competing Teams
 
-We can use this metric to compute the performance of some of the oldest teams:
+We can use our average performance metric to compute the performance of some of the oldest teams.
+We have two possible ways to determine a team's "age":
+
+- The number of seasons they have competed in
+- The number of matches they have competed in
+
+### Number of Seasons Competed vs Average Performance
+
+With the FIRST Robotics Competition starting back in 1992, there have been 29 seasons (including 2020).
+Only three teams exist that have competed in all of those seasons, though 9 teams from 1992 are still active in 2020 (they took a year or more off at some point).
+
+```{r}
+teams %>%
+  filter(rookie_year == 1992 & 2020 %in% years) %>%
+  arrange(team_number) %>%
+  select(team_number, nickname, state_prov, rookie_year, years_competed) %>%
+  knitr::kable(col.names = c("Team #", "Nickname", "State/Province",
+                             "Rookie Year", "Seasons Competed"),
+               align = "lllll")
+```
+
+These teams have been around a long time, but that isn't the norm.
+That is a sample of only 9 out of about 8000 teams that have competed over the 29 seasons.
+The average number of seasons competed in is around 6 years, with a median of 4.
+
+```{r}
+teams %>%
+  ggplot() +
+  geom_violin(aes(years_competed, 0)) +
+  labs(title = "Lifespan of Teams",
+       x = "Seasons Competed",
+       y = "")
+```
+
+Using the number of seasons competed, we can take the top 31 teams based (31 because that is the cutoff between 24 and 25 seasons competed).
 
 ```{r}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   arrange(desc(years_competed), team_num) %>%
-  select(team_num, nickname, rookie_year, years_competed, state_prov, avg_percentile) %>%
-  head(30) %>%
+  select(team_num, nickname, state_prov, rookie_year, years_competed, avg_performance) %>%
+  head(31) %>%
   mutate(nickname = ifelse(team_num == 173, "RAGE Robotics", nickname)) %>%
-  knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
-                             "Years Competed", "State/Province", "Average Percentile"),
+  knitr::kable(col.names = c("Team #", "Nickname", "State/Province", 
+                             "Rookie Year", "Seasons Competed", 
+                             "Average Performance"),
                align = "llllll")
-```
 
-
-## Number of Years Competed vs Average Percentile
-
-```{r, message = FALSE, warning = FALSE}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
-  ggplot(aes(years_competed, avg_percentile)) +
+  filter(years_competed >= 25) %>%
+  ggplot() +
+  geom_point(aes(as.factor(years_competed), avg_performance)) +
+  labs(title = "Performance of Longest Competing Teams by Season",
+       x = "Seasons Competed",
+       y = "Average Performance")
+```
+
+As we can see from this graph, more seasons competed doesn't always equate to higher performance.
+But, if we zoom out a bit and include all teams, we see that there is a distinct improvement over time.
+
+```{r, years_vs_percentile, message = FALSE, warning = FALSE}
+team_percentile_avg %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  ggplot(aes(years_competed, avg_performance)) +
   geom_jitter(height = 0) +
   geom_smooth() +
   ylim(0, 100) +
-  labs(title = "Years Competed vs Average Percentile",
-       x = "Years Competed",
-       y = "Average Percentile")
+  labs(title = "Seasons Competed vs Average Performance",
+       x = "Seasons Competed",
+       y = "Average Performance")
 ```
 
-
-## Numbers of Years Competed vs Average Percentile
-
-When we average the average percentiles for the teams in each group based on years competed, we see noticeable improvement as the teams compete longer.
-(Note that there are very few teams that have competed for over two decades, for example there is only one team that has competed for 28 years.)
+We can average all of the points for each number of seasons competed.
+The improvement isn't uniform and doesn't always improve, especially above 15 seasons competed when the sample size is very small.
 
 ```{r, message = FALSE}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   filter(!is.na(years_competed)) %>%
   group_by(years_competed) %>%
-  summarize(avg_avg_percentile = mean(avg_percentile), num_teams = n()) %>%
+  summarize(avg_avg_performance = mean(avg_performance), num_teams = n()) %>%
   ggplot() +
-  geom_point(aes(as.factor(years_competed), avg_avg_percentile, size = num_teams)) +
-  geom_line(aes(as.factor(years_competed), avg_avg_percentile, group = 1)) +
+  geom_point(aes(as.factor(years_competed), avg_avg_performance, size = num_teams)) +
+  geom_line(aes(as.factor(years_competed), avg_avg_performance, group = 1)) +
   ylim(0, 100) +
-  labs(title = "Years Competed vs Average Average Percentile",
+  labs(title = "Years Competed vs Average of Average Performance",
        x = "Years Competed",
-       y = "Average Average Percentile",
+       y = "Average of Average Performance",
        size = "Number of Teams")
 ```
+
+### Number of Matches Played vs Average Performance
+
+This chart shows how many matches each team has played across the years 2002 to 2019.
+As expected, teams with lower numbers have played more matches (because they've been around longer).
+
+One team to notice is team 9999.
+This team does not actually exist.
+The number 9999 is used as a placeholder for a team that has not received a number yet.
+This usually only happens during preseason and offseason events, though it seems to have happened in a week 0 regional event in 2004.
+
+```{r, matches_played, message = FALSE}
+matches_played_by_team <- matches_by_team %>%
+  group_by(team_num) %>%
+  summarize(played = n()) %>%
+  ungroup()
+
+matches_played_by_team %>%
+  ggplot(aes(team_num, played)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Matches Played by Team Number",
+       x = "Team Number",
+       y = "Matches Played")
+```
+
+We can look at the number of seasons competed vs number of matches played.
+Because teams can attend multiple events, plus some teams attend the championship, the number of matches played can vary greatly.
+
+```{r, seasons_vs_matches_played, message = FALSE, warning = FALSE}
+matches_played_by_team %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  ggplot(aes(years_competed, played)) +
+  geom_jitter(height = 0, width = 0.3) +
+  geom_smooth() +
+  labs(title = "Seasons Competed vs Matches Played",
+       x = "Seasons Competed",
+       y = "Matches Played")
+```
+
+We can then compare the number of matches played by a team with their average performance.
+
+```{r, matches_played_vs_percentile, message = FALSE, warning = FALSE}
+team_percentile_avg %>%
+  left_join(matches_played_by_team, by = "team_num") %>%
+  ggplot(aes(played, avg_performance)) +
+  geom_point() +
+  geom_smooth() +
+  ylim(0, 100) +
+  labs(title = "Matches Played vs Average Performance",
+       x = "Matches Played",
+       y = "Average Performance")
+```
+
+This time we see a very distinct improvement with more experience.
+This could be because of a few factors:
+
+- More seasons mean better performance as well as more matches played
+- Teams that attend the championship are usually there because they performed well in the regular season, meaning better performing teams get to play more matches
 
 ## Number of Events Attended and Performance
 
 Our question here is to figure out how attending multiple events can impact your team's performance and development.
 First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
+
+```{r, team_events_per_year, message = FALSE, include = FALSE}
+team_events_per_year <- matches_by_team %>%
+  group_by(team, team_num, year, event_key, event_type) %>%
+  summarize() %>%
+  ungroup() %>%
+  group_by(team, team_num, year) %>%
+  summarize(events = n(),
+            non_cmp_events = length(event_key[event_type %in% c("regional", 
+                                                                "district")]),
+            attended_dcmp = "district_championship" %in% event_type | 
+              "district_championship_division" %in% event_type,
+            attended_cmp = "championship_division" %in% event_type,
+            in_district = "district" %in% event_type)
+```
 
 ```{r, message = FALSE, echo = FALSE}
 team_events_per_year %>%
@@ -435,7 +545,7 @@ week_avg_score_2019 <- team_avg_by_week_2019 %>%
   summarise(avg.score = mean(avg.score))
 ```
 
-```{r, message = FALSE, echo = FALSE}
+```{r, message = FALSE}
 team_avg_by_week_2019 %>%
   filter(week == "cmpd") %>%
   ggplot() +
@@ -446,10 +556,10 @@ team_avg_by_week_2019 %>%
 
 This is the breakdown of teams in the championship division based on the 4 events attended cutoff we found previously.
 This plot is showing that the teams that attended 4 or more events in 2019 score better in this event than those who didn't.
-We can't use this as evidence that a team that has more experience will score better though since a winning team in the championship division will attend the championship finals, which adds to their event count.
-A more interesing plot is this same boxplot for the championship finals below.
+We can't use this as evidence that a team that has more experience will score better though since a winning team in a championship division will attend the championship finals, which adds to their event count.
+A more interesting plot is this same boxplot for the championship finals below.
 
-```{r, message = FALSE, echo = FALSE}
+```{r, message = FALSE}
 team_avg_by_week_2019 %>%
   filter(week == "cmpf") %>%
   ggplot() +
@@ -462,7 +572,7 @@ This plot tells the opposite story from before.
 The teams that made it to the finals who competed in more events actually performed worse in this case.
 This shows experience in a single season isn't the most reliable indicator of season performance.
 
-```{r, message = FALSE, echo = FALSE}
+```{r, message = FALSE}
 team_avg_by_week_2019 %>%
   filter(events >= 6) %>%
   ggplot() +
@@ -470,9 +580,6 @@ team_avg_by_week_2019 %>%
   geom_line(data = week_avg_score_2019, mapping = aes(x = week, y = avg.score, group = year), size = 2) +
   labs(x = "Week of 2019 Season",
        y = "Team Average Score")
-
-
-
 ```
 
 Here is a breakdown of score progression throughout the 2019 season for teams that competed in 6 or more events.
