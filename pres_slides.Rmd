@@ -1,0 +1,334 @@
+---
+title: "FIRST Robotics Competition: How Much Better Are Experienced Teams?"
+author: "Max Narvaez & Ryan Harvey"
+date: "11/22/2020"
+output: ioslides_presentation
+---
+
+```{r, setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(kableExtra)
+library(maps)
+
+years <- 2002:2019
+
+matches <- readRDS("matches.rds") %>%
+  mutate(week = case_when(
+    event_type == "district_championship_division" ~ "dcmpd",
+    event_type == "district_championship" ~ "dcmp",
+    event_type == "championship_division" ~ "cmpd",
+    event_type == "championship_finals" ~ "cmpf",
+    event_type == "festival_of_champions" ~ "foc",
+    TRUE ~ as.character(week)
+  )) %>%
+  mutate(week = factor(week, c("0", "1", "2", "3", "4", "5", "6", "7",
+                               "dcmpd", "dcmp", "cmpd", "cmpf", "foc")))
+
+scores <- matches %>%
+  pivot_longer(cols = c("red_score", "blue_score"), 
+               names_to = "alliance",
+               values_to = "score") %>%
+  mutate(alliance = as.factor(alliance))
+scores$alliance <- recode_factor(scores$alliance,
+                                 "red_score" = "red",
+                                 "blue_score" = "blue")
+
+teams <- readRDS("teams.rds") %>%
+  filter(rookie_year != 2020) %>%
+  rowwise() %>%
+  mutate(years_competed = length(years))
+
+matches_by_team <- scores %>%
+  pivot_longer(cols = c("red_alliance_1", "red_alliance_2",
+                        "red_alliance_3", "red_alliance_4",
+                        "blue_alliance_1", "blue_alliance_2",
+                        "blue_alliance_3", "blue_alliance_4"),
+               names_to = "position",
+               values_to = "team") %>%
+  filter(!is.na(team)) %>%
+  separate(position, sep = "_alliance_", into = c("team_alliance", "position")) %>%
+  filter(alliance == team_alliance) %>%
+  select(!team_alliance) %>%
+  mutate(team_num = as.integer(str_remove(team, "frc")))
+
+team_avg_by_year <- matches_by_team %>%
+  group_by(team, team_num, year) %>%
+  summarize(avg_score = mean(score))
+
+team_percentile_by_year <- data.frame(
+  team = character(),
+  team_num = integer(),
+  year = integer(),
+  avg_score = double(),
+  percentile = double()
+)
+
+for (yr in years) {
+  x <- team_avg_by_year %>%
+    filter(year == yr)
+  x$percentile <- ecdf(x$avg_score)(x$avg_score) * 100
+  
+  team_percentile_by_year <- bind_rows(team_percentile_by_year, x) %>%
+    arrange(team_num)
+}
+
+team_percentile_avg <- team_percentile_by_year %>%
+  group_by(team, team_num) %>%
+  summarize(avg_performance = mean(percentile)) %>%
+  ungroup()
+
+team_events_per_year <- matches_by_team %>%
+  group_by(team, team_num, year, event_key, event_type) %>%
+  summarize() %>%
+  ungroup() %>%
+  group_by(team, team_num, year) %>%
+  summarize(events = n(),
+            non_cmp_events = length(event_key[event_type %in% c("regional", 
+                                                                "district")]),
+            attended_dcmp = "district_championship" %in% event_type | 
+              "district_championship_division" %in% event_type,
+            attended_cmp = "championship_division" %in% event_type,
+            in_district = "district" %in% event_type)
+
+team_avg_by_week_2019 <- team_events_per_year %>%
+  filter(year == 2019) %>%
+  inner_join(matches_by_team, by = c("team", "team_num", "year")) %>%
+  group_by(team, year, events, week) %>%
+  summarize(avg.score = mean(score))
+
+week_avg_score_2019 <- team_avg_by_week_2019 %>%
+  group_by(year, week) %>%
+  summarise(avg.score = mean(avg.score))
+zip.codes <- read.csv("zipcode.csv")
+```
+## Road Map
+
+- Background
+- Data Scraping
+- Data Analysis
+    1. Performance Within A Season
+    2. Performance Over Multiple Seasons
+    3. Top Performing Teams of All Time
+    4. Performance of Longest Competing Teams
+    5. Events Attended in a Season and Performance
+- Conclusion
+
+## Background
+
+The FIRST Robotics Competition (FRC) is a competition where teams build a robot for 6ish weeks, then compete in one or more events to try to secure a spot in the championship. In 2019, there were over 3800 active teams competing at over 160 events worldwide.
+
+<div style="float: left; width: 40%;">
+
+```{r background1, out.width = '90%'}
+knitr::include_graphics("FRClogo.png")
+```
+
+</div>
+
+<div style="float: right; width: 60%;">
+```{r background2, fig.width=5.5}
+teams %>%
+  filter(2019 %in% years & country == "USA") %>%
+  mutate(postal_code = parse_number(postal_code)) %>%
+  left_join(zip.codes, by = c("postal_code" = "ZIP")) %>%
+  filter(!is.na(LAT) & !is.na(LNG)) %>%
+  filter(LNG > -140 & LAT > 20) %>%
+  group_by(postal_code) %>%
+  summarize(count = n(), LAT = LAT, LNG = LNG) %>%
+  ggplot(aes(LNG, LAT, alpha = count)) +
+  geom_point() +
+  borders("state") +
+  coord_quickmap() +
+  labs(x = "", y = "")
+```
+</div>
+## Data Scraping
+
+Info from the section Max is working on
+
+Data Sources
+
+- The Blue Alliance
+
+- Zip code data from erichurst on GitHub
+
+## Data Analysis
+
+Our goal is to examine how the experience of a team impacts their performance. We will do this by examining the following trends:
+
+- How a team performs as the season progresses
+- How does a team perform over multiple seasons
+- How do the most experienced teams perform
+- How do the most active teams within a season perform
+
+## 1. Performance Within A Season
+
+```{r performace-within-season}
+scores %>%
+  filter(year == 2016) %>%
+  ggplot() +
+  geom_boxplot(aes(week, score)) +
+  labs(title = "Score Distribution by Week - 2016")
+```
+
+## 2. Performance Over Multiple Seasons
+Score Difference Each Year
+
+<div style="float: left; width: 50%;">
+```{r performance-multiple-seasons1.1}
+scores %>%
+  group_by(year) %>%
+  summarize(avg_score = mean(score)) %>%
+  head(9) %>%
+  knitr::kable(col.names = c("Year", "Average Score"),
+               align = "ll",
+               digits = 2) %>%
+  kable_styling(font_size = 12, bootstrap_options = c("striped", "condensed"))
+```
+</div>
+
+<div style="float: right; width: 50%;">
+```{r performance-multiple-seasons1.2}
+scores %>%
+  group_by(year) %>%
+  summarize(avg_score = mean(score)) %>%
+  tail(9) %>%
+  knitr::kable(col.names = c("Year", "Average Score"),
+               align = "ll",
+               digits = 2) %>%
+  kable_styling(font_size = 12, bootstrap_options = c("striped", "condensed"))
+```
+</div>
+
+Scores vary year to year, so we calculated team score percentile each year to compare seasons.
+
+## 2. Performance Over Multiple Seasons
+Max's Former Team
+
+```{r performance-multiple-seasons2}
+team_percentile_by_year %>%
+  filter(team_num == 2855) %>%
+  ggplot(aes(as.factor(year), percentile, group = 1)) +
+  geom_line() +
+  ylim(0, 100) +
+  labs(title = "Performance of Team 2855",
+       x = "Year",
+       y = "Percentile")
+```
+
+## 3. Top Performing Teams of All Time
+
+```{r top-teams}
+team_percentile_avg %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  arrange(desc(avg_performance)) %>%
+  select(team_num, nickname, rookie_year, years_competed, state_prov, avg_performance) %>%
+  head(15) %>%
+  knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
+                             "Years Competed", "State/Province", "Average Performance"),
+               align = "llllll") %>%
+  kable_styling(font_size = 12, bootstrap_options = c("striped", "condensed"))
+```
+
+## 4. Performance of Longest Competing Teams
+
+```{r longest-teams1}
+teams %>%
+  ggplot() +
+  geom_violin(aes(years_competed, 0)) +
+  labs(title = "Lifespan of Teams",
+       x = "Seasons Competed",
+       y = "")
+```
+
+## 4. Performance of Longest Competing Teams
+
+Defining experience as number of seasons completed versus number of matches played
+
+<div style="float: left; width: 50%;">
+```{r longest-teams2.1, fig.width=4, fig.height=3}
+team_percentile_avg %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  ggplot(aes(years_competed, avg_performance)) +
+  geom_jitter(height = 0) +
+  geom_smooth() +
+  ylim(0, 100) +
+  labs(title = "Seasons Competed vs Average Performance",
+       x = "Seasons Competed",
+       y = "Average Performance")
+```
+</div>
+
+<div style="float: right; width: 50%;">
+```{r longest-teams2.2, fig.width=4, fig.height=3}
+matches_played_by_team <- matches_by_team %>%
+  group_by(team_num) %>%
+  summarize(played = n()) %>%
+  ungroup()
+
+team_percentile_avg %>%
+  left_join(matches_played_by_team, by = "team_num") %>%
+  ggplot(aes(played, avg_performance)) +
+  geom_point() +
+  geom_smooth() +
+  ylim(0, 100) +
+  labs(title = "Matches Played vs Average Performance",
+       x = "Matches Played",
+       y = "Average Performance")
+```
+</div>
+
+## 5. Events Attended in a Season and Performance
+
+```{r events-attended1}
+team_events_per_year %>%
+  left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
+  filter(year == 2019) %>%
+  ggplot() +
+  geom_boxplot(aes(x = as.factor(events), y = percentile)) +
+  labs(x = "Number of Events Attended",
+       y = "Score Percentile for Year",
+       title = as.character(yr))
+```
+
+## 5. Events Attended in a Season and Performance
+
+```{r events-attended2}
+team_avg_by_week_2019 %>%
+  filter(events >= 6) %>%
+  ggplot() +
+  geom_line(aes(x = week, y = avg.score, group = team, color = team)) +
+  geom_line(data = week_avg_score_2019, mapping = aes(x = week, y = avg.score, group = year), size = 2) +
+  labs(x = "Week of 2019 Season",
+       y = "Team Average Score")
+```
+
+## Conclusion
+
+- A more experienced team performs better in competition
+- It is tough to quantify the effect of experience on performance
+- A team must be successful to become experienced (seasons completed or matches played)
+
+```{r, eval = FALSE, include = FALSE}
+#We examined how scores improve throughout a season. The regular season doesn't grow too dramatically, but once districts and the championship finals are reached scores leap up - almost double in 2016.
+
+#With scores differing between seasons, it is tough to compare a team's performance each year. We calculated percentiles for a team in respect to how they performed compared to other teams. This gave us a better idea of year-to-year performance.
+
+#Percentile gives us a chance to see what the longest running top teams are and how Max's team is doing. We can see they did well in 2016, but have gone downhill after Max left.
+
+#Number of Seasons Competed vs Average Performance
+#We took a look at some of the longest competing teams. It is certainly not always the case that the more seasons competed equate to higher scores, but there is a positive trend. The newest teams average around the 40th percentile for scores, whereas the most established teams average around the 75th percentile.
+
+#Number of Matches Played vs Average Performance
+#We also defined the longest competing teams in terms of matches played. This shows a much more dramatic increase in scores. We still can't conclude that simply playing more matches makes you better since a longer lasting team is probably one that has been successful and that the successful teams will compete in more matches each season in the championships.
+
+#We took a look at how teams progress throughout a season. The teams that played more matches in a season did score higher than the average. What's more impressive is that these teams continued to increase their score as the season went on at a rate faster than average.
+
+#It is tough to say how much experience actually causes better scores. The experienced teams both in terms of seasons and matches played are certainly much better on average, but to become an experienced team means you must've been successful. However, it is clear that teams progress throughout the season, and the teams that make it the farthest make more progress than any other team.
+
+#With a growing community worldwide, it will be interesting to see where FRC goes in the next decade.
+```
+
+
+
