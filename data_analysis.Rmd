@@ -1,11 +1,11 @@
 ---
-title: "Final Project"
+title: "Analysis of FIRST Robotics Competition Team Performance"
+author: "Ryan Harvey and Max Narvaez"
 output: 
   html_document:
     code_folding: hide
     toc: true
     toc_float: true
-    df_print: paged
 knit: (function(inputFile, encoding) { 
            rmarkdown::render(inputFile, 
                              encoding = encoding, 
@@ -16,7 +16,7 @@ editor_options:
   chunk_output_type: inline
 ---
 
-```{r, setup, include = FALSE}
+```{r, setup, message = FALSE}
 library(tidyverse)
 library(maps)
 
@@ -43,11 +43,6 @@ scores$alliance <- recode_factor(scores$alliance,
                                  "red_score" = "red",
                                  "blue_score" = "blue")
 
-teams <- readRDS("teams.rds") %>%
-  filter(rookie_year != 2020) %>%
-  rowwise() %>%
-  mutate(years_competed = length(years))
-
 matches_by_team <- scores %>%
   pivot_longer(cols = c("red_alliance_1", "red_alliance_2",
                         "red_alliance_3", "red_alliance_4",
@@ -60,6 +55,11 @@ matches_by_team <- scores %>%
   filter(alliance == team_alliance) %>%
   select(!team_alliance) %>%
   mutate(team_num = as.integer(str_remove(team, "frc")))
+
+teams <- readRDS("teams.rds") %>%
+  filter(rookie_year != 2020) %>%
+  rowwise() %>%
+  mutate(years_competed = length(years))
 ```
 
 ## Background
@@ -144,8 +144,83 @@ teams %>%
   ggplot(aes(LNG, LAT, alpha = count)) +
   geom_point() +
   borders("state") +
-  coord_quickmap()
+  coord_quickmap() +
+  labs(title = "US Team Locations",
+       x = "",
+       y = "",
+       alpha = "# of Teams")
 ```
+
+## Data Scraping
+
+We got all of the match data from [The Blue Alliance](thebluealliance.com), a website with team and match data for the FIRST Robotics Competition.
+They have a public API that we were able to utilize to pull the data.
+
+### Scraping Match Data
+
+The match data in The Blue Alliance is split up by event.
+First we get a list of event names for a given year using the `/events/{year}` API endpoint.
+We then filter the events based on their type, omitting any offseason and preseason events.
+For each event, we use the `event/{event_name}/matches/simple` API endpoint to get our match data.
+
+We then check that we actually got data (some events from the early years have no match data).
+If we did, we clean up our data.
+One part of cleaning the data includes extracting the 2-4 teams that competed on each alliance in each match.
+Each alliance's teams are in a list in a column of the data frame.
+We would like to have the teams located in columns based on their position and alliance (i.e. `red_alliance_1`, `blue_alliance_3`, etc.).
+First, we use `unnest()` to create a new row for each team on the blue alliance.
+We then group the matches by their key, which is the unique identifier given by The Blue Alliance.
+Then, we assign a number to each row for a match by creating a new column with `seq_along()`.
+This is essentially creating a column with the index the team had in the list of teams.
+We then use `spread()` to put the team name in a column with the name `1`, `2`, `3`, or `4`, based on that column we just created.
+Last, we either rename the column from `1` to `blue_alliance_1` if the column `1` exists, otherwise put `NA` into `blue_alliance_1`, repeating for `blue_alliance_2`, `blue_alliance_3` and `blue_alliance_4`.
+We then repeat these same steps for the red alliance.
+We also add the year, week, and type of the event to every row, as well as convert the `comp_level` column to a factor.
+
+To combine all the events for a year into one data frame, we use `bind_rows()`, with an empty data frame at the beginning.
+Then we recode the `event_type` column's factor names from integers into strings that describe the event type.
+We also fill in the winning alliance for any matches without a winning alliance with `tie`, because if a match was a tie The Blue Alliance leaves that data point empty.
+
+We then combine all the years into one comprehensive data frame, sort by `year`, `event_key`, `comp_level`, `set_number` and `match_number`.
+
+Lastly, we save all this data to a `.rds` file.
+The 140,386 matches we have data for take up 2.6 MB to store when compressed into a `.rds` file, compared to 15.6 MB if uncompressed in a `.csv`.
+
+After we read in the `.rds`, we do a little more data manipulation to denotes postseason events separately from the regular season events in the `week` column using `case_when()`, followed by another `mutate()` that converts the week column to a factor.
+This is stored in the `matches` data frame.
+
+We also create another data frame called `scores` which has each alliance score in its own row (meaning two rows per match).
+This is achieved with `pivot_longer()`, `mutate()`, and `recode_factor()`.
+
+The last data frame we create when loading data contains the match data with each row having a single team from the match (meaning 4-8 rows per match).
+Starting with our `scores` data frame, we use `pivot_longer()` to create 8 rows per match, then filter out the rows that have no team (which shrinks the data frame from 2.25 million rows to only 1.65 million).
+Then we split up the column that contained the alliance and position the team had in the match into two columns containing those data points separately.
+We then remove any rows where the alliance the team was on doesn't match up with the alliance whose score is stored in that row (which halves the size of our data frame to the final size of 826,282 rows).
+We then remove the `team_alliance` column (using syntax that requires a newer version of `dplyr` than is available on the R Server) because it contains the same data as the `alliance` column that already existed.
+Last, we create a new column with the team's number as an integer by removing the `frc` prefix that The Blue Alliance includes in every team key.
+
+### Scraping Team Data
+
+The team data is available from the `teams/{page}` API endpoint.
+This returns a list of teams, which is split into pages of 500 teams at a time.
+We use `bind_rows()` again to combine these lists into one data frame.
+
+The years that teams have competed is not included in the data from above, so we have to get it separately for each team.
+The Blue Alliance has the `team/{team_key}/years_participated` endpoint for this.
+We created a function that is used by a `mutate()` to go through all the teams in our data frame and request a list of the years they participated.
+It then compiles a list of all the lists of years and returns that, which mutate puts into our data frame.
+
+We then save this to another `.rds` file, this time because a `.csv` does not support having columns with a list data type.
+
+When we read in the data, we create one last column which is the number of years the team has competed, based on the length of the list of years they have competed.
+We also remove any teams that have a rookie year of 2020 because we have excluded all match data from 2020.
+
+### Scraping Zip Code Information
+
+To get the location of US zip codes, we are able to pull a table from a [GitHub Gist](https://gist.githubusercontent.com/erichurst/7882666/raw/5bdc46db47d9515269ab12ed6fb2850377fd869e/US%2520Zip%2520Codes%2520from%25202013%2520Government%2520Data) and save it as a `.csv`.
+
+
+## Research Question
 
 ## Performance Within a Season
 
@@ -313,7 +388,7 @@ team_percentile_avg %>%
 A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, performing in the 99.91th percentile on average.
 (Notice that the graph only shows the 95th to 100th percentiles, and yet they're still at the top.)
 
-```{r, perform}
+```{r, performance_2056}
 team_percentile_by_year %>%
   filter(team_num == 2056) %>%
   ggplot(aes(as.factor(year), percentile, group = 1)) +
@@ -340,7 +415,7 @@ We have two possible ways to determine a team's "age":
 With the FIRST Robotics Competition starting back in 1992, there have been 29 seasons (including 2020).
 Only three teams exist that have competed in all of those seasons, though 9 teams from 1992 are still active in 2020 (they took a year or more off at some point).
 
-```{r}
+```{r, rookie_in_1992}
 teams %>%
   filter(rookie_year == 1992 & 2020 %in% years) %>%
   arrange(team_number) %>%
@@ -354,7 +429,7 @@ These teams have been around a long time, but that isn't the norm.
 That is a sample of only 9 out of about 8000 teams that have competed over the 29 seasons.
 The average number of seasons competed in is around 6 years, with a median of 4.
 
-```{r}
+```{r, team_lifespan}
 teams %>%
   ggplot() +
   geom_violin(aes(years_competed, 0)) +
@@ -365,7 +440,7 @@ teams %>%
 
 Using the number of seasons competed, we can take the top 31 teams based (31 because that is the cutoff between 24 and 25 seasons competed).
 
-```{r}
+```{r, oldest_teams_by_seasons}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   arrange(desc(years_competed), team_num) %>%
@@ -390,7 +465,7 @@ team_percentile_avg %>%
 As we can see from this graph, more seasons competed doesn't always equate to higher performance.
 But, if we zoom out a bit and include all teams, we see that there is a distinct improvement over time.
 
-```{r, years_vs_percentile, message = FALSE, warning = FALSE}
+```{r, seasons_vs_performance, message = FALSE, warning = FALSE}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   ggplot(aes(years_competed, avg_performance)) +
@@ -405,7 +480,7 @@ team_percentile_avg %>%
 We can average all of the points for each number of seasons competed.
 The improvement isn't uniform and doesn't always improve, especially above 15 seasons competed when the sample size is very small.
 
-```{r, message = FALSE}
+```{r, seasons_vs_avg_avg_performance, message = FALSE}
 team_percentile_avg %>%
   left_join(teams, by = c("team_num" = "team_number")) %>%
   filter(!is.na(years_competed)) %>%
@@ -415,8 +490,8 @@ team_percentile_avg %>%
   geom_point(aes(as.factor(years_competed), avg_avg_performance, size = num_teams)) +
   geom_line(aes(as.factor(years_competed), avg_avg_performance, group = 1)) +
   ylim(0, 100) +
-  labs(title = "Years Competed vs Average of Average Performance",
-       x = "Years Competed",
+  labs(title = "Seasons Competed vs Average of Average Performance",
+       x = "Seasons Competed",
        y = "Average of Average Performance",
        size = "Number of Teams")
 ```
@@ -448,6 +523,7 @@ matches_played_by_team %>%
 
 We can look at the number of seasons competed vs number of matches played.
 Because teams can attend multiple events, plus some teams attend the championship, the number of matches played can vary greatly.
+Note that we only have match data going back to 2002, so teams that competed before that are missing matches in our data set.
 
 ```{r, seasons_vs_matches_played, message = FALSE, warning = FALSE}
 matches_played_by_team %>%
@@ -462,7 +538,7 @@ matches_played_by_team %>%
 
 We can then compare the number of matches played by a team with their average performance.
 
-```{r, matches_played_vs_percentile, message = FALSE, warning = FALSE}
+```{r, matches_played_vs_performance, message = FALSE, warning = FALSE}
 team_percentile_avg %>%
   left_join(matches_played_by_team, by = "team_num") %>%
   ggplot(aes(played, avg_performance)) +
@@ -485,7 +561,7 @@ This could be because of a few factors:
 Our question here is to figure out how attending multiple events can impact your team's performance and development.
 First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
 
-```{r, team_events_per_year, message = FALSE, include = FALSE}
+```{r, team_events_per_year, message = FALSE}
 team_events_per_year <- matches_by_team %>%
   group_by(team, team_num, year, event_key, event_type) %>%
   summarize() %>%
@@ -498,9 +574,7 @@ team_events_per_year <- matches_by_team %>%
               "district_championship_division" %in% event_type,
             attended_cmp = "championship_division" %in% event_type,
             in_district = "district" %in% event_type)
-```
 
-```{r, message = FALSE, echo = FALSE}
 team_events_per_year %>%
   left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
   filter(year == 2019) %>%
@@ -517,7 +591,7 @@ Clearly, the average score percentile for a team that attends a lot of events wi
 It is interesting to see how high a team's score percentile needs to be in order for them to expect to compete in many events.
 For example, in 2019 there were only a few teams that were below the 80th percentile that competed in 5 events.
 
-```{r, message = FALSE, echo = FALSE}
+```{r, weeks_vs_events_attended, message = FALSE}
 team_events_per_year %>%
   filter(year == 2019) %>%
   inner_join(matches_by_team, by = c("team", "team_num", "year")) %>%
@@ -533,7 +607,7 @@ team_events_per_year %>%
 These boxplots don't reveal too many interesting trends, but they give us an understanding of how the average number of events a team participates is based on how far they make it in a season.
 When we investigate the 2019 scores of the championship division and the championship finals, we can use the median number of events attended 4 and 5, respectively to compare the team scores between teams that attended a lot of events and few events.
 
-```{r, message = FALSE, echo = FALSE}
+```{r, teams_4_plus_events, message = FALSE}
 team_avg_by_week_2019 <- team_events_per_year %>%
   filter(year == 2019) %>%
   inner_join(matches_by_team, by = c("team", "team_num", "year")) %>%
@@ -543,9 +617,7 @@ team_avg_by_week_2019 <- team_events_per_year %>%
 week_avg_score_2019 <- team_avg_by_week_2019 %>%
   group_by(year, week) %>%
   summarise(avg.score = mean(avg.score))
-```
 
-```{r, message = FALSE}
 team_avg_by_week_2019 %>%
   filter(week == "cmpd") %>%
   ggplot() +
@@ -559,7 +631,7 @@ This plot is showing that the teams that attended 4 or more events in 2019 score
 We can't use this as evidence that a team that has more experience will score better though since a winning team in a championship division will attend the championship finals, which adds to their event count.
 A more interesting plot is this same boxplot for the championship finals below.
 
-```{r, message = FALSE}
+```{r, teams_5_plus_events, message = FALSE}
 team_avg_by_week_2019 %>%
   filter(week == "cmpf") %>%
   ggplot() +
@@ -572,7 +644,7 @@ This plot tells the opposite story from before.
 The teams that made it to the finals who competed in more events actually performed worse in this case.
 This shows experience in a single season isn't the most reliable indicator of season performance.
 
-```{r, message = FALSE}
+```{r, score_avg_most_competed_teams_2019, message = FALSE}
 team_avg_by_week_2019 %>%
   filter(events >= 6) %>%
   ggplot() +

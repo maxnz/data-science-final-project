@@ -10,7 +10,7 @@ library(rvest)
 library(httr)
 library(jsonlite)
 library(dplyr)
-# library(RCurl)
+library(RCurl)
 
 years <- 2002:2019
 ```
@@ -230,7 +230,6 @@ get_teams <- function(df) {
   for (page in 0:16) {
     df <- bind_rows(df, clean_team_data(get_teams_page(page)))
   }
-  years_competed_url <- "https://www.thebluealliance.com/api/v3/team/"
   df %>%
     mutate(years = get_years_competed(key))
 }
