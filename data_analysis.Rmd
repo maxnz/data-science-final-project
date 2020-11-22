@@ -487,7 +487,7 @@ This could be because of a few factors:
 Our question here is to figure out how attending multiple events can impact your team's performance and development.
 First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
 
-```{r, team_events_per_year, message = FALSE, include = FALSE}
+```{r, team_events_per_year, message = FALSE, echo = FALSE}
 team_events_per_year <- matches_by_team %>%
   group_by(team, team_num, year, event_key, event_type) %>%
   summarize() %>%
@@ -502,7 +502,7 @@ team_events_per_year <- matches_by_team %>%
             in_district = "district" %in% event_type)
 ```
 
-```{r, message = FALSE, echo = FALSE}
+```{r, message = FALSE}
 team_events_per_year %>%
   left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
   filter(year == 2019) %>%
@@ -519,7 +519,7 @@ Clearly, the average score percentile for a team that attends a lot of events wi
 It is interesting to see how high a team's score percentile needs to be in order for them to expect to compete in many events.
 For example, in 2019 there were only a few teams that were below the 80th percentile that competed in 5 events.
 
-```{r, message = FALSE, echo = FALSE}
+```{r, message = FALSE}
 team_events_per_year %>%
   filter(year == 2019) %>%
   inner_join(matches_by_team, by = c("team", "team_num", "year")) %>%
