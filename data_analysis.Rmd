@@ -1,5 +1,7 @@
 ---
-title: "Final Project"
+title: "FIRST Robotics Competition: How Much Better Are Experienced Teams?"
+author: "Max Narvaez & Ryan Harvey"
+date: "11/22/2020"
 output: 
   html_document:
     code_folding: hide
@@ -480,7 +482,7 @@ This could be because of a few factors:
 - More seasons mean better performance as well as more matches played
 - Teams that attend the championship are usually there because they performed well in the regular season, meaning better performing teams get to play more matches
 
-## Number of Events Attended and Performance
+## Events Attended in a Season and Performance
 
 Our question here is to figure out how attending multiple events can impact your team's performance and development.
 First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
@@ -590,3 +592,9 @@ The black line is the team average score each week for all the teams, not just t
 The scores of the more experienced teams are usually higher than this average for each week.
 The black line has a few sudden jumps, which can be explained by the jump from regular season to postseason, and the jump to the finals.
 The jumps are caused by the competition level increases that eliminate lower scoring teams.
+
+## Conclusion
+
+In this report, we set out to analyze how the performance of a team is related to how experienced they are. The first step we took was to calculate score percentiles to compare different competition years since scores vary drastically based on the theme of the competition. Once we had percentiles, we took a look at the year-to-year performance of individual teams such as OP Robotics and Max's former team. Percentiles were also a valuable tool to compare teams based on experience. We defined experience in two ways: number of seasons and number of matches. In both cases, the more experienced teams had much better scores with an average percentile rank of about 40 more than newer teams. Finally, we took a look at how teams progress throughout a season. The teams that played more matches in a season did score higher than the average. What's more impressive is that these teams continued to increase their score as the season went on at a rate faster than average.
+
+It is tough to quantify the effect of experience on performance. The experienced teams both in terms of seasons completed and matches played are certainly much better on average and score higher. We also saw that the teams that progress the most through the course of the season are the ones that attend the most events. However, we can't say this is all due to experience since a team must be successful to become experienced. That means playing more matches by making it to championship events in a season or completing more seasons by lasting many years because the team has performed well. All in all, a more experienced team performs better in competition.
