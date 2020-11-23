@@ -1,7 +1,7 @@
 ---
 title: "FIRST Robotics Competition: How Much Better Are Experienced Teams?"
-author: "Max Narvaez & Ryan Harvey"
-date: "11/22/2020"
+author: "Max Narvaez and Ryan Harvey"
+date: "November 23, 2020"
 output: 
   html_document:
     code_folding: hide
@@ -99,7 +99,7 @@ team_percentile_avg <- team_percentile_by_year %>%
 
 To measure performance, we will use:
 
-- A team's average score compared to all other teams' scores
+- A team's average score's percentile when compared to all other teams' scores in that year (we'll explain what this means later)
 
 To measure experience within a season, we will use:
 
@@ -111,7 +111,7 @@ To measure experience across seasons, we will use:
 - The number of seasons a team has competed in
 - The number of matches a team has played in
 
-We will get to our answer to this question shortly, but first let's get some background on what the FIRST Robotics Competition is.
+We will answer this question shortly, but first let's get some background on what the FIRST Robotics Competition is.
 
 ## Background
 
@@ -130,7 +130,7 @@ At the championship, you pick three other teams, which means your backup is buil
 
 A regional is a competition of ~50-60 teams.
 The winning alliance gets to go to the championship.
-If a team in the winning alliance already qualified for the championship, then a team from the second-place alliance gets to go.
+If a team in the winning alliance has already qualified for the championship, then a team from the second-place alliance gets to go.
 A district is a geographical area where teams attend two ~30-40 team events instead, followed by a district championship.
 The top teams in the district championship get to go to the championship.
 
@@ -141,7 +141,7 @@ We only have match data from 2002 to the present.
 Each year, teams are challenged by a new competition.
 Everything from making robots play basketball to attacking a castle have been themes for competitions.
 One year, teams may be asked to collect and launch balls into a target (2002, 2004, 2006, 2008, 2009, 2010, 2012, 2014, 2016, 2017, 2019) and the next year be asked to pick up inflatable shapes and place them onto pegs (2007, 2011).
-There have also been years with stacking bins (2003, 2015), a year with tetras (basically a hollow tetrahedron that can be stacked) (2005), a year of ultimate frisbee (2013), and a year with milk crates (2018).
+There have also been years with stacking bins (2003, 2015), a year with tetras (basically a hollow tetrahedron that can be stacked) (2005), a year of ultimate frisbee (2013), a year with large plastic gears (2017), and a year with milk crates (2018).
 
 ### Team Locations
 
@@ -202,7 +202,74 @@ teams %>%
        alpha = "# of Teams")
 ```
 
+## Calculating Performance
+
+Because the competition changes every year, comparing raw scores from one year to the next is not a good measure of performance.
+For example, the 2010 competition had an average match score of 4.08, while the 2018 competition had an average match score of 291.90.
+
+```{r, year_score_avgs, message = FALSE}
+scores %>%
+  group_by(year) %>%
+  summarize(avg_score = mean(score)) %>%
+  knitr::kable(col.names = c("Year", "Average Score"),
+               align = "ll")
+```
+
+We found that a good way to compare across years is to compute a team's performance relative to the rest of the teams in the competition that year.
+By calculating the average score achieved by each team, we can determine what percentile each team achieved in a given year.
+
+For example, the performance of Team 2855 (Max's former team) is shown below:
+
+```{r, performance_2855}
+team_percentile_by_year %>%
+  filter(team_num == 2855) %>%
+  ggplot(aes(as.factor(year), percentile, group = 1)) +
+  geom_line() +
+  ylim(0, 100) +
+  labs(title = "Performance of Team 2855",
+       x = "Year",
+       y = "Score Percentile")
+```
+
+As shown here, Team 2855 has had a couple of good years, but overall has been an ok team at best.
+
+We can compare this to Team 3691, based out of Northfield High School:
+
+```{r, performance_3691}
+team_percentile_by_year %>%
+  filter(team_num == 3691) %>%
+  ggplot(aes(as.factor(year), percentile, group = 1)) +
+  geom_line() +
+  ylim(0, 100) +
+  labs(title = "Performance of Team 3691",
+       x = "Year",
+       y = "Score Percentile")
+```
+
+At first glance, it seems like Team 3691 has been a better-performing team than Team 2855.
+We can average all of a team's score percentiles to determine an average score percentile.
+
+```{r, performance_2855_3691_comp}
+team_percentile_avg %>%
+  filter(team_num %in% c(2855, 3691)) %>%
+  left_join(teams, by = c("team_num" = "team_number")) %>%
+  arrange(team_num) %>%
+  select(team_num, nickname, rookie_year, years_competed, avg_performance) %>%
+  head(20) %>%
+  knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
+                             "Years Competed", "Average Score Percentile"),
+               align = "lllll")
+```
+
+This confirms that Team 3691 is a better-performing team than Team 2855.
+
+This metric is not perfect, however, because it does not account for factors such as who your alliance members are and who is on the opposing alliance.
+For example, in one match you could have one of the top teams in the competition on your alliance which helps you easily win.
+In another match, both of your alliance members' robots could break which makes you lose.
+
 ## Performance Within a Season
+
+### Performance by Week of Competition
 
 To evaluate performance within a season, we can compare each week of competition.
 Because the season is multiple weeks long, events happening on the same weekend are classified as being part of that "week" of competition.
@@ -215,7 +282,9 @@ scores %>%
   filter(year == 2017 & week %in% 0:6) %>%
   ggplot() +
   geom_violin(aes(week, score)) +
-  labs(title = "Score Distribution by Week - 2017")
+  labs(title = "Score Distribution by Week - 2017",
+       x = "Week",
+       y = "Score")
 ```
 
 But in the 2009 season, there isn't any obvious improvement:
@@ -225,7 +294,9 @@ scores %>%
   filter(year == 2009 & week %in% 0:5) %>%
   ggplot() +
   geom_violin(aes(week, score)) +
-  labs(title = "Score Distribution by Week - 2009")
+  labs(title = "Score Distribution by Week - 2009",
+       x = "Week",
+       y = "Score")
 ```
 
 If we include the championship events, we consistently see an improvement over the weeks prior.
@@ -236,7 +307,9 @@ scores %>%
   filter(year == 2009) %>%
   ggplot() +
   geom_violin(aes(week, score)) +
-  labs(title = "Score Distribution by Week - 2009")
+  labs(title = "Score Distribution by Week - 2009",
+       x = "Week",
+       y = "Score")
 ```
 
 In many years, the difference between the Championship Finals and other levels can be drastic.
@@ -248,7 +321,9 @@ scores %>%
   filter(year == 2016) %>%
   ggplot() +
   geom_violin(aes(week, score)) +
-  labs(title = "Score Distribution by Week - 2016")
+  labs(title = "Score Distribution by Week - 2016",
+       x = "Week",
+       y = "Score")
 ```
 
 Using a boxplot, we can see that the average score in a Championship Finals match is almost double that of the average score in the Championship Divisions.
@@ -258,10 +333,12 @@ scores %>%
   filter(year == 2016) %>%
   ggplot() +
   geom_boxplot(aes(week, score)) +
-  labs(title = "Score Distribution by Week - 2016")
+  labs(title = "Score Distribution by Week - 2016",
+       x = "Week",
+       y = "Score")
 ```
 
-### Events Attended in a Season and Performance
+### Events Attended in a Season vs Performance
 
 Our question here is to figure out how attending multiple events can impact your team's performance and development.
 First, we will divide teams based on how many events they attended in a given season and see how the score percentile compares between number of events teams attended.
@@ -285,9 +362,9 @@ team_events_per_year %>%
   filter(year == 2019) %>%
   ggplot() +
   geom_boxplot(aes(x = as.factor(events), y = percentile)) +
-  labs(x = "Number of Events Attended",
-       y = "Score Percentile for Year",
-       title = as.character(yr))
+  labs(title = "Events Attended vs Score Percentile",
+       x = "Number of Events Attended",
+       y = "Score Percentile for Year")
 ```
 
 These results aren't too shocking, but they give us some useful information to keep in mind later.
@@ -304,9 +381,9 @@ team_events_per_year %>%
   summarize(matches = n()) %>%
   ggplot() +
   geom_boxplot(aes(x = week, y = events)) +
-  labs(x = "Week",
-       y = "Number of Events the Teams Attended Throughout the Year",
-       title = as.character(yr))
+  labs(title = "Events Attended vs Competition Week - 2019",
+       x = "Week",
+       y = "Number of Events the Teams Attended Throughout the Year")
 ```
 
 These boxplots don't reveal too many interesting trends, but they give us an understanding of how the average number of events a team participates is based on how far they make it in a season.
@@ -327,7 +404,8 @@ team_avg_by_week_2019 %>%
   filter(week == "cmpd") %>%
   ggplot() +
   geom_boxplot(aes(x = (events >= 4), y = avg.score)) +
-  labs(x = "Team Attended 4 or More Events in 2019",
+  labs(title = "Team Attended 4 or More Events in 2019",
+       x = "",
        y = "Average Score at Championship Division")
 ```
 
@@ -341,7 +419,8 @@ team_avg_by_week_2019 %>%
   filter(week == "cmpf") %>%
   ggplot() +
   geom_boxplot(aes(x = (events >= 5), y = avg.score)) +
-  labs(x = "Team Attended 5 or More Events in 2019",
+  labs(title = "Team Attended 5 or More Events in 2019",
+       x = "",
        y = "Average Score at Championship Finals")
 ```
 
@@ -355,7 +434,8 @@ team_avg_by_week_2019 %>%
   ggplot() +
   geom_line(aes(x = week, y = avg.score, group = team, color = team)) +
   geom_line(data = week_avg_score_2019, mapping = aes(x = week, y = avg.score, group = year), size = 2) +
-  labs(x = "Week of 2019 Season",
+  labs(title = "Scores Of Teams Competing in 6+ Events - 2019",
+       x = "Week",
        y = "Team Average Score")
 ```
 
@@ -363,75 +443,16 @@ Here is a breakdown of score progression throughout the 2019 season for teams th
 These are the teams that competed in the most events of all the teams.
 All of the teams have positive trends that indicate the teams are still progressing through each of the many events they attend in the 2019 season.
 
-The black line is the team average score each week for all the teams, not just the one's who attended a lot of events.
+The black line is the team average score each week for all the teams, not just those who attended a lot of events.
 The scores of the more experienced teams are usually higher than this average for each week.
 The black line has a few sudden jumps, which can be explained by the jump from regular season to postseason, and the jump to the finals.
 The jumps are caused by the competition level increases that eliminate lower scoring teams.
 
-## Comparing Performance Across Multiple Seasons
-
-Because the competition changes every year, comparing raw scores from one year to the next is not a good measure of performance.
-For example, the 2010 competition had an average match score of 4.07, while the 2018 competition had an average match score of 291.90.
-
-```{r, year_score_avgs, message = FALSE}
-scores %>%
-  group_by(year) %>%
-  summarize(avg_score = mean(score)) %>%
-  knitr::kable(col.names = c("Year", "Average Score"),
-               align = "ll")
-```
-
-We found that a good way to compare across years is to compute a team's performance relative to the rest of the teams in the competition that year.
-By calculating the average score achieved by each team, we can determine what percentile each team achieved in a given year.
-
-For example, the performance of Team 2855 (Max's former team) is shown below:
-
-```{r, performance_2855}
-team_percentile_by_year %>%
-  filter(team_num == 2855) %>%
-  ggplot(aes(as.factor(year), percentile, group = 1)) +
-  geom_line() +
-  ylim(0, 100) +
-  labs(title = "Performance of Team 2855",
-       x = "Year",
-       y = "Percentile")
-```
-
-As shown here, Team 2855 has had a couple of good years, but overall has been an ok team at best.
-
-We can compare this to Team 3691, based out of Northfield High School:
-
-```{r, performance_3691}
-team_percentile_by_year %>%
-  filter(team_num == 3691) %>%
-  ggplot(aes(as.factor(year), percentile, group = 1)) +
-  geom_line() +
-  ylim(0, 100) +
-  labs(title = "Performance of Team 3691",
-       x = "Year",
-       y = "Percentile")
-```
-
-At first glance, it seems like Team 3691 has been a better-performing team than Team 2855.
-We can average all of a team's percentiles to determine an average performance.
-
-```{r, performance_2855_3691_comp}
-team_percentile_avg %>%
-  filter(team_num %in% c(2855, 3691)) %>%
-  left_join(teams, by = c("team_num" = "team_number")) %>%
-  arrange(team_num) %>%
-  select(team_num, nickname, rookie_year, years_competed, avg_performance) %>%
-  head(20) %>%
-  knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
-                             "Years Competed", "Average Performance"),
-               align = "lllll")
-```
-
-This confirms that Team 3691 is a better-performing team than Team 2855.
+## Performance Across Multiple Seasons
 
 ### Top Performing Teams of All Time
 
-We can use our average performance metric to determine the top teams of all time:
+We can use our average score percentile performance metric to determine the top teams of all time:
 
 ```{r, top_performance}
 team_percentile_avg %>%
@@ -440,11 +461,11 @@ team_percentile_avg %>%
   select(team_num, nickname, rookie_year, years_competed, state_prov, avg_performance) %>%
   head(20) %>%
   knitr::kable(col.names = c("Team #", "Nickname", "Rookie Year", 
-                             "Years Competed", "State/Province", "Average Performance"),
+                             "Years Competed", "State/Province", "Average Score Percentile"),
                align = "llllll")
 ```
 
-A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, performing in the 99.91th percentile on average.
+A team that stands out here is Team 2056 (aptly named "OP Robotics"), who has been able to perform at an impressive level in all 14 years they've competed, performing at the 99.91th score percentile on average.
 (Notice that the graph only shows the 95th to 100th percentiles, and yet they're still at the top.)
 
 ```{r, performance_2056}
@@ -456,14 +477,14 @@ team_percentile_by_year %>%
   ylim(95, 100) +
   labs(title = "Performance of Team 2056",
        x = "Year",
-       y = "Percentile")
+       y = "Score Percentile")
 ```
 
 Other teams that stand out are teams 2970 and 2098, which only competed for one season but were one of the best teams in that season.
 
 ### Performance of Longest Competing Teams
 
-We can use our average performance metric to compute the performance of some of the oldest teams.
+We can also use our performance metric to compute the performance of some of the oldest teams.
 We have two possible ways to determine a team's "age":
 
 - The number of seasons they have competed in
@@ -472,7 +493,7 @@ We have two possible ways to determine a team's "age":
 #### Number of Seasons Competed vs Average Performance
 
 With the FIRST Robotics Competition starting back in 1992, there have been 29 seasons (including 2020).
-Only three teams exist that have competed in all of those seasons, though 9 teams from 1992 are still active in 2020 (they took a year or more off at some point).
+Only three teams exist that have competed in all of those seasons, though nine teams from 1992 are still active in 2020 (the other six took a year or more off at some point).
 
 ```{r, rookie_in_1992}
 teams %>%
@@ -497,7 +518,7 @@ teams %>%
        y = "")
 ```
 
-Using the number of seasons competed, we can take the top 31 teams based (31 because that is the cutoff between 24 and 25 seasons competed).
+Using the number of seasons competed, we can take the top 31 teams based on seasons competed (31 because that is the cutoff between 24 and 25 seasons competed).
 
 ```{r, oldest_teams_by_seasons}
 team_percentile_avg %>%
@@ -508,7 +529,7 @@ team_percentile_avg %>%
   mutate(nickname = ifelse(team_num == 173, "RAGE Robotics", nickname)) %>%
   knitr::kable(col.names = c("Team #", "Nickname", "State/Province", 
                              "Rookie Year", "Seasons Competed", 
-                             "Average Performance"),
+                             "Average Score Percentile"),
                align = "llllll")
 
 team_percentile_avg %>%
@@ -518,11 +539,11 @@ team_percentile_avg %>%
   geom_point(aes(as.factor(years_competed), avg_performance)) +
   labs(title = "Performance of Longest Competing Teams by Season",
        x = "Seasons Competed",
-       y = "Average Performance")
+       y = "Average Score Percentile")
 ```
 
-As we can see from this graph, more seasons competed doesn't always equate to higher performance.
-But, if we zoom out a bit and include all teams, we see that there is a distinct improvement over time.
+This graph tells us that more seasons competed doesn't always equate to higher performance.
+But, if we zoom out a bit and include all teams, we see that there actually is a distinct improvement over time.
 
 ```{r, seasons_vs_performance, message = FALSE, warning = FALSE}
 team_percentile_avg %>%
@@ -533,10 +554,10 @@ team_percentile_avg %>%
   ylim(0, 100) +
   labs(title = "Seasons Competed vs Average Performance",
        x = "Seasons Competed",
-       y = "Average Performance")
+       y = "Average Score Percentile")
 ```
 
-We can average all of the points for each number of seasons competed.
+Averaging all of the data points for each number of seasons competed gives us the graph below.
 The improvement isn't uniform and doesn't always improve, especially above 15 seasons competed when the sample size is very small.
 
 ```{r, seasons_vs_avg_avg_performance, message = FALSE}
@@ -549,10 +570,10 @@ team_percentile_avg %>%
   geom_point(aes(as.factor(years_competed), avg_avg_performance, size = num_teams)) +
   geom_line(aes(as.factor(years_competed), avg_avg_performance, group = 1)) +
   ylim(0, 100) +
-  labs(title = "Seasons Competed vs Average of Average Performance",
+  labs(title = "Seasons Competed vs Average of Average Performances",
        x = "Seasons Competed",
-       y = "Average of Average Performance",
-       size = "Number of Teams")
+       y = "Average Score Percentile",
+       size = "# of Teams")
 ```
 
 #### Number of Matches Played vs Average Performance
@@ -606,7 +627,7 @@ team_percentile_avg %>%
   ylim(0, 100) +
   labs(title = "Matches Played vs Average Performance",
        x = "Matches Played",
-       y = "Average Performance")
+       y = "Average Score Percentile")
 ```
 
 This time we see a very distinct improvement with more experience.
@@ -619,20 +640,22 @@ This could be because of a few factors:
 
 In this report, we set out to analyze how the performance of a team is related to how experienced they are.
 The first step we took was to calculate score percentiles to compare different competition years since scores vary drastically based on the theme of the competition.
-Once we had percentiles, we took a look at the year-to-year performance of individual teams such as OP Robotics and Max's former team.
-Percentiles were also a valuable tool to compare teams based on experience.
-We defined experience in two ways: number of seasons and number of matches.
-In both cases, the more experienced teams had much better scores with an average percentile rank of about 40 more than newer teams.
-Finally, we took a look at how teams progress throughout a season.
+Once we had teams' score percentiles, we took a look at the year-to-year performance of individual teams such as OP Robotics and Max's former team, BEASTBot.
+We also took a look at how teams progress throughout a season.
 The teams that played more matches in a season did score higher than the average.
 What's more impressive is that these teams continued to increase their score as the season went on at a rate faster than average.
+Score percentiles were also a valuable tool to compare teams based on experience.
+We defined experience in two ways: number of seasons and number of matches.
+In both cases, the more experienced teams had much better scores with an average percentile rank of about 40 more than newer teams.
 
 It is tough to quantify the effect of experience on performance.
 The experienced teams both in terms of seasons completed and matches played are certainly much better on average and score higher.
 We also saw that the teams that progress the most through the course of the season are the ones that attend the most events.
-However, we can't say this is all due to experience since a team must be successful to become experienced.
-That means playing more matches by making it to championship events in a season or completing more seasons by lasting many years because the team has performed well.
-All in all, a more experienced team performs better in competition.
+However, we can't say this is all due to experience.
+Some of the top teams of all time as calculated by our performance metric lasted only one season and performed exceptionally well during that season.
+Success also brings more experience because teams that do well in an event and get to play in the playoff matches will get more experience.
+Teams that attend championship events in a season by performing well will also get to play more matches and thus get more experience.
+That said, we have found that a more experienced team tends to perform better in competition.
 
 ## Data Scraping
 
@@ -688,16 +711,16 @@ The team data is available from the `teams/{page}` API endpoint.
 This returns a list of teams, which is split into pages of 500 teams at a time.
 We use `bind_rows()` again to combine these lists into one data frame.
 
-The years that teams have competed is not included in the data from above, so we have to get it separately for each team.
+The years that teams have competed in is not included in the data from above, so we have to get it separately for each team.
 The Blue Alliance has the `team/{team_key}/years_participated` endpoint for this.
 We created a function that is used by a `mutate()` to go through all the teams in our data frame and request a list of the years they participated.
 It then compiles a list of all the lists of years and returns that, which mutate puts into our data frame.
 
 We then save this to another `.rds` file, this time because a `.csv` does not support having columns with a list data type.
 
-When we read in the data, we create one last column which is the number of years the team has competed, based on the length of the list of years they have competed.
+When we read in the data, we create one last column which is the number of years the team has competed, based on the length of the list of years they have competed in.
 We also remove any teams that have a rookie year of 2020 because we have excluded all match data from 2020.
 
-### Scraping Zip Code Information
+### Scraping Zip Code Data
 
 To get the location of US zip codes, we are able to pull a table from a [GitHub Gist](https://gist.githubusercontent.com/erichurst/7882666/raw/5bdc46db47d9515269ab12ed6fb2850377fd869e/US%2520Zip%2520Codes%2520from%25202013%2520Government%2520Data) and save it as a `.csv`.
