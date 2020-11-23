@@ -10,6 +10,8 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(tidyverse)
 library(kableExtra)
 library(maps)
+library(httr)
+library(jsonlite)
 
 years <- 2002:2019
 
@@ -108,10 +110,10 @@ zip.codes <- read.csv("zipcode.csv")
 - Data Scraping
 - Data Analysis
     1. Performance Within A Season
-    2. Performance Over Multiple Seasons
-    3. Top Performing Teams of All Time
-    4. Performance of Longest Competing Teams
-    5. Events Attended in a Season and Performance
+    2. Events Attended in a Season and Performance
+    3. Performance Over Multiple Seasons
+    4. Top Performing Teams of All Time
+    5. Performance of Longest Competing Teams
 - Conclusion
 
 ## Background
@@ -143,15 +145,119 @@ teams %>%
   labs(x = "", y = "")
 ```
 </div>
-## Data Scraping
 
-Info from the section Max is working on
+## Data Scraping
 
 Data Sources
 
 - The Blue Alliance
 
 - Zip code data from erichurst on GitHub
+
+## Data Scraping
+
+The Blue Alliance API Endpoints
+
+- `/events/{year}`
+- `/event/{event_name}/matches/simple`
+- `/teams/{page}`
+- `/team/{team_key}/years_participated`
+
+## Data Scraping
+
+### Raw Data
+
+```{r}
+auth_key <- "WyfmKoTeQ8ntOY0s1yfdXhaHsn8uN4myOOYp58A5P4OwGk2ohXRV54Kmc0tHJ7CM"
+url <- "https://www.thebluealliance.com/api/v3/event/2019mnmi/matches/simple"
+ex_data <- as_tibble(jsonlite::fromJSON(
+  content(GET(url,
+              add_headers("X-TBA-Auth-Key" = auth_key)),
+          "parse", 
+          as = "text", 
+          encoding = "UTF-8"),
+  flatten = TRUE
+)) %>%
+  head(1)
+
+ex_data %>%
+  select(alliances.blue.team_keys) %>%
+  knitr::kable()
+```
+<div style="margin-top: 50px;">
+
+### Cleaned Data
+
+```{r}
+ex_data %>%
+  unnest(alliances.blue.team_keys) %>%
+  group_by(key) %>%
+  mutate(col = seq_along(key)) %>%
+  spread(key = col, 
+         value = alliances.blue.team_keys) %>%
+  { if ("1" %in% colnames(.)) rename(., blue_alliance_1 = `1`)
+    else mutate(., blue_alliance_1 = NA) } %>%
+  { if ("2" %in% colnames(.)) rename(., blue_alliance_2 = `2`)
+    else mutate(., blue_alliance_2 = NA) } %>%
+  { if ("3" %in% colnames(.)) rename(., blue_alliance_3 = `3`)
+    else mutate(., blue_alliance_3 = NA) } %>%
+  { if ("4" %in% colnames(.)) rename(., blue_alliance_4 = `4`)
+    else mutate(., blue_alliance_4 = NA) } %>%
+  ungroup() %>%
+  select(blue_alliance_1, blue_alliance_2, blue_alliance_3) %>%
+  knitr::kable()
+  
+```
+</div>
+
+## Data Scraping
+
+```
+df %>%
+  unnest(alliances.blue.team_keys) %>%
+  group_by(key) %>%
+  mutate(col = seq_along(key)) %>%
+  spread(key = col, 
+         value = alliances.blue.team_keys) %>%
+  { if ("1" %in% colnames(.)) rename(., blue_alliance_1 = `1`)
+    else mutate(., blue_alliance_1 = NA) } %>%
+  { if ("2" %in% colnames(.)) rename(., blue_alliance_2 = `2`)
+    else mutate(., blue_alliance_2 = NA) } %>%
+  { if ("3" %in% colnames(.)) rename(., blue_alliance_3 = `3`)
+    else mutate(., blue_alliance_3 = NA) } %>%
+  { if ("4" %in% colnames(.)) rename(., blue_alliance_4 = `4`)
+    else mutate(., blue_alliance_4 = NA) }
+```
+
+## Data Manipulation
+
+```
+matches <- readRDS("matches.rds") %>%
+  mutate(week = case_when(
+    event_type == "district_championship_division" ~ "dcmpd",
+    event_type == "district_championship" ~ "dcmp",
+    event_type == "championship_division" ~ "cmpd",
+    event_type == "championship_finals" ~ "cmpf",
+    event_type == "festival_of_champions" ~ "foc",
+    TRUE ~ as.character(week)
+  )) %>%
+  mutate(week = factor(week, c("0", "1", "2", "3", "4", "5", "6", "7",
+                               "dcmpd", "dcmp", "cmpd", "cmpf", "foc")))
+```
+
+## Data Manipulation
+
+```
+for (yr in years) {
+  x <- team_avg_by_year %>%
+    filter(year == yr)
+  # ecdf = Empirical Cumulative Distribution Function
+  x$percentile <- ecdf(x$avg_score)(x$avg_score) * 100
+  
+  team_percentile_by_year <- bind_rows(team_percentile_by_year, x) %>%
+    arrange(team_num)
+}
+```
 
 ## Data Analysis
 
@@ -172,7 +278,7 @@ scores %>%
   labs(title = "Score Distribution by Week - 2016")
 ```
 
-## 5. Events Attended in a Season and Performance
+## 2. Events Attended in a Season and Performance
 
 ```{r events-attended1}
 team_events_per_year %>%
