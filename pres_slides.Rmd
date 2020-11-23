@@ -157,10 +157,10 @@ Data Sources
 
 Our goal is to examine how the experience of a team impacts their performance. We will do this by examining the following trends:
 
-- How a team performs as the season progresses
+- How teams perform as the season progresses
+- How do the most active teams within a season perform
 - How does a team perform over multiple seasons
 - How do the most experienced teams perform
-- How do the most active teams within a season perform
 
 ## 1. Performance Within A Season
 
@@ -172,7 +172,32 @@ scores %>%
   labs(title = "Score Distribution by Week - 2016")
 ```
 
-## 2. Performance Over Multiple Seasons
+## 5. Events Attended in a Season and Performance
+
+```{r events-attended1}
+team_events_per_year %>%
+  left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
+  filter(year == 2019) %>%
+  ggplot() +
+  geom_boxplot(aes(x = as.factor(events), y = percentile)) +
+  labs(x = "Number of Events Attended",
+       y = "Score Percentile for Year",
+       title = as.character(yr))
+```
+
+## 2. Events Attended in a Season and Performance
+
+```{r events-attended2}
+team_avg_by_week_2019 %>%
+  filter(events >= 6) %>%
+  ggplot() +
+  geom_line(aes(x = week, y = avg.score, group = team, color = team)) +
+  geom_line(data = week_avg_score_2019, mapping = aes(x = week, y = avg.score, group = year), size = 2) +
+  labs(x = "Week of 2019 Season",
+       y = "Team Average Score")
+```
+
+## 3. Performance Over Multiple Seasons
 Score Difference Each Year
 
 <div style="float: left; width: 50%;">
@@ -203,7 +228,7 @@ scores %>%
 
 Scores vary year to year, so we calculated team score percentile each year to compare seasons.
 
-## 2. Performance Over Multiple Seasons
+## 3. Performance Over Multiple Seasons
 Max's Former Team
 
 ```{r performance-multiple-seasons2}
@@ -217,7 +242,7 @@ team_percentile_by_year %>%
        y = "Percentile")
 ```
 
-## 3. Top Performing Teams of All Time
+## 4. Top Performing Teams of All Time
 
 ```{r top-teams}
 team_percentile_avg %>%
@@ -231,7 +256,7 @@ team_percentile_avg %>%
   kable_styling(font_size = 12, bootstrap_options = c("striped", "condensed"))
 ```
 
-## 4. Performance of Longest Competing Teams
+## 5. Performance of Longest Competing Teams
 
 ```{r longest-teams1}
 teams %>%
@@ -242,7 +267,7 @@ teams %>%
        y = "")
 ```
 
-## 4. Performance of Longest Competing Teams
+## 5. Performance of Longest Competing Teams
 
 Defining experience as number of seasons completed versus number of matches played
 
@@ -278,31 +303,6 @@ team_percentile_avg %>%
        y = "Average Performance")
 ```
 </div>
-
-## 5. Events Attended in a Season and Performance
-
-```{r events-attended1}
-team_events_per_year %>%
-  left_join(team_percentile_by_year, by = c("team", "team_num", "year")) %>%
-  filter(year == 2019) %>%
-  ggplot() +
-  geom_boxplot(aes(x = as.factor(events), y = percentile)) +
-  labs(x = "Number of Events Attended",
-       y = "Score Percentile for Year",
-       title = as.character(yr))
-```
-
-## 5. Events Attended in a Season and Performance
-
-```{r events-attended2}
-team_avg_by_week_2019 %>%
-  filter(events >= 6) %>%
-  ggplot() +
-  geom_line(aes(x = week, y = avg.score, group = team, color = team)) +
-  geom_line(data = week_avg_score_2019, mapping = aes(x = week, y = avg.score, group = year), size = 2) +
-  labs(x = "Week of 2019 Season",
-       y = "Team Average Score")
-```
 
 ## Conclusion
 
