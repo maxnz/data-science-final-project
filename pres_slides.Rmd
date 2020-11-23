@@ -108,6 +108,7 @@ zip.codes <- read.csv("zipcode.csv")
 
 - Background
 - Data Scraping
+- Data Manipulation
 - Data Analysis
     1. Performance Within A Season
     2. Events Attended in a Season and Performance
